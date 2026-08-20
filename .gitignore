@@ -104,3 +104,10 @@ Desktop.ini
 *.db
 *.dump
 *.sql.gz
+.vercel
+
+# Capturas de la guía de usuario: son del CRM con datos reales de clientes
+# (nombres, correos, teléfonos). Se regeneran con
+# scripts/capture-guide-screenshots.mjs, así que no vale la pena meter 12 MB de
+# PNG con datos personales en un historial que no se puede limpiar.
+docs/user-guide-screenshots/

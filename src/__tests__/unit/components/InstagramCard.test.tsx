@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LazyInstagramCard } from "../../../app/pages/HomePage";
+import { LocaleProvider } from "../../../app/i18n/LocaleContext";
+import { MemoryRouter } from "react-router";
 
 // Mock IntersectionObserver to immediately trigger inView = true
 class MockIntersectionObserver implements IntersectionObserver {
@@ -49,7 +51,13 @@ describe("LazyInstagramCard Component", () => {
       caption: "Publicación de prueba sobre inmuebles en Querétaro",
     };
 
-    render(<LazyInstagramCard post={post} />);
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <LazyInstagramCard post={post} />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
 
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute(
@@ -71,7 +79,13 @@ describe("LazyInstagramCard Component", () => {
       caption: "Reel inmobiliario destacado",
     };
 
-    render(<LazyInstagramCard post={post} />);
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <LazyInstagramCard post={post} />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
 
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute(
@@ -92,7 +106,13 @@ describe("LazyInstagramCard Component", () => {
       caption: "Imagen que fallará",
     };
 
-    render(<LazyInstagramCard post={post} />);
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <LazyInstagramCard post={post} />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
 
     const img = screen.getByRole("img");
     fireEvent.error(img);
@@ -114,7 +134,13 @@ describe("LazyInstagramCard Component", () => {
       caption: "Post sin archivo multimedia estático",
     };
 
-    render(<LazyInstagramCard post={post} />);
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <LazyInstagramCard post={post} />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
 
     const iframe = screen.getByTitle("Publicación de Instagram NOMEDIA1");
     expect(iframe).toBeInTheDocument();

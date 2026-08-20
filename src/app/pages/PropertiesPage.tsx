@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useLocale } from "../i18n/LocaleContext";
+import { useSearchParams } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { SearchBar, SearchFilters } from "../components/SearchBar";
@@ -16,6 +18,7 @@ import { propertyMatchesTypeFilter } from "../lib/propertyTypesCatalog";
 import { SlidersHorizontal, Building2, Map, LayoutGrid, MapPinned } from "lucide-react";
 
 export function PropertiesPage() {
+  const { t } = useLocale();
   const [searchParams] = useSearchParams();
   const { properties } = useCatalogProperties();
   const catalogPriceSlices = useMemo(
@@ -208,9 +211,9 @@ export function PropertiesPage() {
                 className="px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all text-sm font-medium"
                 style={{ fontWeight: 500 }}
               >
-                {CATALOG_PROPERTY_SORT_OPTIONS.map(({ value, label }) => (
+                {CATALOG_PROPERTY_SORT_OPTIONS.map(({ value, labelKey }) => (
                   <option key={value} value={value}>
-                    {label}
+                    {t(labelKey)}
                   </option>
                 ))}
               </select>

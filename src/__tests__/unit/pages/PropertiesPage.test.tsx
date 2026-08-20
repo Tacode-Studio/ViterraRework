@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import React from "react";
 import { PropertiesPage } from "../../../app/pages/PropertiesPage";
 import { SiteContentProvider } from "../../../contexts/SiteContentContext";
+import { LocaleProvider } from "../../../app/i18n/LocaleContext";
 import * as supabaseClientModule from "../../../app/lib/supabaseClient";
 import * as useCatalogPropertiesModule from "../../../app/hooks/useCatalogProperties";
 
@@ -38,7 +39,9 @@ describe("PropertiesPage Component", () => {
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter>
-      <SiteContentProvider>{children}</SiteContentProvider>
+      <LocaleProvider>
+        <SiteContentProvider>{children}</SiteContentProvider>
+      </LocaleProvider>
     </MemoryRouter>
   );
 

@@ -43,6 +43,18 @@ describe("publicListingUrl", () => {
     );
   });
 
+  it("acepta la etiqueta del idioma activo", () => {
+    expect(
+      appendListingLinkToMessage("Hi.", "https://viterra.test/p/1", "Listing"),
+    ).toBe("Hi.\n\nListing: https://viterra.test/p/1");
+  });
+
+  it("una etiqueta vacía cae al valor por defecto en vez de dejar ': url'", () => {
+    expect(appendListingLinkToMessage("Hola.", "https://viterra.test/p/1", "  ")).toBe(
+      "Hola.\n\nFicha: https://viterra.test/p/1",
+    );
+  });
+
   it("deja el mensaje intacto cuando no hay enlace", () => {
     expect(appendListingLinkToMessage("Hola.", "")).toBe("Hola.");
     expect(appendListingLinkToMessage("Hola.", undefined)).toBe("Hola.");

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, Link, useLocation } from "react-router";
+import { useParams, useLocation } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import type { Map as LeafletMap } from "leaflet";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -42,6 +43,9 @@ import { useSiteContent } from "../../contexts/SiteContentContext";
 import { mergeSiteSection } from "../../lib/siteContentMerge";
 import { resolveWhatsappHref, whatsappDisplayLabel } from "../lib/whatsappLink";
 import { appendListingLinkToMessage, propertyPublicUrl } from "../lib/publicListingUrl";
+import { useLocale, type TranslateFn } from "../i18n/LocaleContext";
+import type { Locale } from "../i18n/locale";
+import { translateCatalogFeatures, translatePropertyType } from "../i18n/catalogTerms";
 import { resolveTelHref, formatPhoneForDisplay } from "../lib/phoneLink";
 import { hasRichDescription, RICH_DESCRIPTION_HTML_CLASS, sanitizeRichHtml } from "../lib/propertyDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
@@ -64,26 +68,43 @@ const T = {
 } as const;
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
-function listingActivityLabel(iso: string | undefined): string {
+/** Etiqueta de fecha para `Intl`: el idioma del sitio, no el del navegador. */
+function intlLocale(locale: Locale): string {
+  return locale === "en" ? "en-US" : "es-MX";
+}
+
+function listingActivityLabel(
+  iso: string | undefined,
+  t: TranslateFn,
+  locale: Locale,
+): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   const diff = Date.now() - d.getTime();
   const days = Math.floor(diff / 86400000);
-  if (days < 0) return "Reciente";
-  if (days === 0) return "Hoy";
-  if (days === 1) return "Ayer";
-  if (days < 7) return `Hace ${days} días`;
-  if (days < 30) return `Hace ${Math.round(days / 7)} semanas`;
-  return d.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
+  if (days < 0) return t("detail.recent");
+  if (days === 0) return t("detail.today");
+  if (days === 1) return t("detail.yesterday");
+  if (days < 7) return t("detail.daysAgo", { n: days });
+  if (days < 30) return t("detail.weeksAgo", { n: Math.round(days / 7) });
+  return d.toLocaleDateString(intlLocale(locale), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
-function formatDeliveryDateEs(raw: string): string {
+function formatDeliveryDate(raw: string, locale: Locale): string {
   const t = raw.trim();
   if (!t || t.toUpperCase() === "EMPTY") return "";
   const d = new Date(t);
   if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" });
+    return d.toLocaleDateString(intlLocale(locale), {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   }
   return t;
 }
@@ -144,6 +165,7 @@ const PROPERTIES_GLOBAL_WA_HREF  = "https://wa.me/523331991774";
 export function PropertyDetailPage() {
   const { id } = useParams();
   const location = useLocation();
+  const { locale, t } = useLocale();
   const { properties, loading } = useCatalogProperties();
   const { isFavorite, toggleFavorite } = useWishlist();
   const { content } = useSiteContent();
@@ -234,9 +256,15 @@ export function PropertyDetailPage() {
   const hasTour3d = resolvedTours3d.length > 0;
 
   const whatsappInterestMessage = useMemo(() => {
-    const base = `Hola, me interesa la propiedad ${property?.publicationTitle?.trim() || property?.title || ""}.`;
-    return appendListingLinkToMessage(base, propertyPublicUrl(property?.id, property?.tokkoId));
-  }, [property?.publicationTitle, property?.title, property?.id, property?.tokkoId]);
+    const base = t("wa.propertyInterest", {
+      title: property?.publicationTitle?.trim() || property?.title || "",
+    });
+    return appendListingLinkToMessage(
+      base,
+      propertyPublicUrl(property?.id, property?.tokkoId),
+      t("wa.listingLabel"),
+    );
+  }, [t, property?.publicationTitle, property?.title, property?.id, property?.tokkoId]);
   const telHref = useMemo(() => {
     const fromProp = resolveTelHref(property?.contactPhone);
     if (fromProp) return fromProp;
@@ -255,17 +283,21 @@ export function PropertyDetailPage() {
   }, [property?.contactWhatsapp, contactSite.quickWhatsappHref, whatsappInterestMessage]);
 
   const propertyTags = useMemo(
-    () => (property?.tags ?? []).map((t) => t.trim()).filter(Boolean),
-    [property?.tags],
+    () =>
+      translateCatalogFeatures(
+        (property?.tags ?? []).map((t) => t.trim()).filter(Boolean),
+        locale,
+      ),
+    [property?.tags, locale],
   );
 
   const propertyDetailTabs = useMemo(() => {
-    const core: Array<{ id: string; label: string }> = [{ id: "descripcion", label: "Descripción" }];
+    const core: Array<{ id: string; label: string }> = [{ id: "descripcion", label: t("detail.tabDescription") }];
     if (hasVideo) core.push({ id: "video", label: resolvedVideos.length > 1 ? `Videos (${resolvedVideos.length})` : "Video" });
     if (hasTour3d) core.push({ id: "tour3d", label: resolvedTours3d.length > 1 ? `Recorridos 3D (${resolvedTours3d.length})` : "Recorrido 3D" });
-    if (hasLinkedProject) core.push({ id: "desarrollo", label: "Proyecto" });
-    core.push({ id: "unidad", label: "Esta publicación" });
-    core.push({ id: "ubicacion", label: "Ubicación" });
+    if (hasLinkedProject) core.push({ id: "desarrollo", label: t("detail.tabProject") });
+    core.push({ id: "unidad", label: t("detail.tabListing") });
+    core.push({ id: "ubicacion", label: t("detail.tabLocation") });
     return core;
   }, [hasLinkedProject, hasVideo, hasTour3d, resolvedVideos.length, resolvedTours3d.length]);
 
@@ -341,7 +373,7 @@ export function PropertyDetailPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitError(null);
     const client = getSupabaseClient();
-    if (!client) { setSubmitError("No hay conexión al servidor."); return; }
+    if (!client) { setSubmitError(t("common.noConnection")); return; }
     setSubmitting(true);
     try {
       const { error } = await submitCatalogLeadViaRpc(client, { name: formData.name, email: formData.email, phone: formData.phone, message: formData.message, propertyId: property!.id });
@@ -398,7 +430,7 @@ export function PropertyDetailPage() {
         <div data-reveal className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-2xl font-semibold mb-4" style={{ color: T.navy }}>Propiedad no encontrada</h2>
-            <Link to="/renta" className="font-medium transition-colors" style={{ color: T.gold }}>Volver a propiedades</Link>
+            <Link to="/renta" className="font-medium transition-colors" style={{ color: T.gold }}>{t("detail.backToProperties")}</Link>
           </div>
         </div>
         <Footer />
@@ -554,7 +586,7 @@ export function PropertyDetailPage() {
                     fontSize: "0.62rem", letterSpacing: "0.14em", fontWeight: 700,
                     color: T.gold, textTransform: "uppercase",
                   }}>
-                    {propertyStatusLabel(property.status)}
+                    {propertyStatusLabel(property.status, locale)}
                   </span>
                   <span style={{
                     padding: "4px 11px", borderRadius: 4,
@@ -563,7 +595,7 @@ export function PropertyDetailPage() {
                     fontSize: "0.62rem", letterSpacing: "0.1em", fontWeight: 600,
                     color: T.navy, textTransform: "uppercase",
                   }}>
-                    {property.type}
+                    {translatePropertyType(property.type, locale)}
                   </span>
                   {property.featured ? (
                     <span style={{
@@ -590,7 +622,7 @@ export function PropertyDetailPage() {
                   </button>
                   <button
                     type="button"
-                    aria-label="Copiar enlace de la publicación"
+                    aria-label={t("detail.copyLink")}
                     onClick={(e) => { e.stopPropagation(); void handleShare(); }}
                     className="flex items-center justify-center transition-all hover:scale-105"
                     style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
@@ -712,7 +744,7 @@ export function PropertyDetailPage() {
                     {activeTab === "desarrollo" && hasLinkedProject && (
                       <div className="space-y-5">
                         {developmentLoading ? (
-                          <p className="text-sm" style={{ color: T.muted }}>Cargando datos del proyecto…</p>
+                          <p className="text-sm" style={{ color: T.muted }}>{t("detail.loadingProject")}</p>
                         ) : linkedDevelopment ? (
                           <div className="space-y-5 p-5 md:p-6" style={{ borderRadius: 10, border: `1px solid ${T.borderGold}`, background: T.goldFaint }}>
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -742,7 +774,7 @@ export function PropertyDetailPage() {
                             <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: T.muted }}>
                               <Calendar className="h-4 w-4" style={{ color: T.gold }} strokeWidth={1.5} />
                               <span style={{ color: T.gold, fontSize: "0.7rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700 }}>Entrega estimada:</span>
-                              <span style={{ color: T.navy, fontWeight: 600 }}>{formatDeliveryDateEs(linkedDevelopment.deliveryDate) || displayDeliveryDate(linkedDevelopment.deliveryDate)}</span>
+                              <span style={{ color: T.navy, fontWeight: 600 }}>{formatDeliveryDate(linkedDevelopment.deliveryDate, locale) || displayDeliveryDate(linkedDevelopment.deliveryDate)}</span>
                             </div>
                             {isMeaningfulText(linkedDevelopment.priceRange) ? (
                               <p className="text-sm" style={{ color: T.muted }}>
@@ -752,9 +784,9 @@ export function PropertyDetailPage() {
                             ) : null}
                             <GoldRule />
                             <div className="space-y-7 pd-features-light">
-                              <FeatureSection variant="amenity" title="Amenidades" items={linkedDevelopment.amenities} keyPrefix="dev-am" />
-                              <FeatureSection variant="service" title="Servicios" items={linkedDevelopment.services} keyPrefix="dev-sv" />
-                              <FeatureSection variant="extra" title="Características adicionales" items={linkedDevelopment.additionalFeatures} keyPrefix="dev-af" />
+                              <FeatureSection variant="amenity" items={linkedDevelopment.amenities} keyPrefix="dev-am" />
+                              <FeatureSection variant="service" items={linkedDevelopment.services} keyPrefix="dev-sv" />
+                              <FeatureSection variant="extra" items={linkedDevelopment.additionalFeatures} keyPrefix="dev-af" />
                             </div>
                           </div>
                         ) : (
@@ -807,9 +839,9 @@ export function PropertyDetailPage() {
                       <div className="space-y-6">
                         {hasCatalogFeatureLists ? (
                           <div className="space-y-7 pd-features-light">
-                            <FeatureSection variant="amenity" title="Amenidades" items={property.amenities ?? []} keyPrefix="u-am" layout="list" />
-                            <FeatureSection variant="service" title="Servicios" items={property.services ?? []} keyPrefix="u-sv" layout="list" />
-                            <FeatureSection variant="extra" title="Características adicionales" items={property.additionalFeatures ?? []} keyPrefix="u-af" layout="list" />
+                            <FeatureSection variant="amenity" items={property.amenities ?? []} keyPrefix="u-am" layout="list" />
+                            <FeatureSection variant="service" items={property.services ?? []} keyPrefix="u-sv" layout="list" />
+                            <FeatureSection variant="extra" items={property.additionalFeatures ?? []} keyPrefix="u-af" layout="list" />
                           </div>
                         ) : (
                           <div className="px-5 py-10 text-center" style={{ borderRadius: 8, border: `1px dashed ${T.border}`, background: T.canvas }}>
@@ -874,7 +906,7 @@ export function PropertyDetailPage() {
                                 color: mapViewMode === mode ? T.gold : T.muted,
                               }}
                             >
-                              {mode === "map" ? "Mapa" : "Satélite"}
+                              {mode === "map" ? "Mapa" : t("map.satellite")}
                             </button>
                           ))}
                         </div>
@@ -948,7 +980,7 @@ export function PropertyDetailPage() {
                 <div className="mb-5 space-y-3">
                   {(property.status === "venta" || property.status === "venta_y_alquiler") && (
                     <div>
-                      <EyebrowLabel>{property.status === "venta_y_alquiler" ? "Precio de Venta" : "Precio"}</EyebrowLabel>
+                      <EyebrowLabel>{property.status === "venta_y_alquiler" ? t("detail.salePrice") : t("card.priceLabel")}</EyebrowLabel>
                       <p
                         className="mt-1"
                         style={{
@@ -965,7 +997,7 @@ export function PropertyDetailPage() {
                   )}
                   {(property.status === "alquiler" || property.status === "venta_y_alquiler") && (
                     <div>
-                      <EyebrowLabel>{property.status === "venta_y_alquiler" ? "Precio de Renta" : "Renta mensual"}</EyebrowLabel>
+                      <EyebrowLabel>{property.status === "venta_y_alquiler" ? t("detail.rentPrice") : "Renta mensual"}</EyebrowLabel>
                       <p
                         className="mt-1"
                         style={{
@@ -994,9 +1026,9 @@ export function PropertyDetailPage() {
                   style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", background: T.canvas }}
                 >
                   {[
-                    { icon: <Bed className="w-4 h-4" strokeWidth={1.4} />, value: property.bedrooms, label: "Recámaras" },
-                    { icon: <Bath className="w-4 h-4" strokeWidth={1.4} />, value: property.bathrooms, label: "Baños" },
-                    { icon: <Square className="w-4 h-4" strokeWidth={1.4} />, value: `${property.area.toLocaleString()} m²`, label: "Cubierta" },
+                    { icon: <Bed className="w-4 h-4" strokeWidth={1.4} />, value: property.bedrooms, label: t("card.bedrooms") },
+                    { icon: <Bath className="w-4 h-4" strokeWidth={1.4} />, value: property.bathrooms, label: t("card.bathrooms") },
+                    { icon: <Square className="w-4 h-4" strokeWidth={1.4} />, value: `${property.area.toLocaleString()} m²`, label: t("detail.coveredArea") },
                   ].map((stat, i) => (
                     <div
                       key={i}
@@ -1043,30 +1075,30 @@ export function PropertyDetailPage() {
                 transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
                 style={{ borderRadius: 12, background: T.white, boxShadow: "0 2px 16px rgba(20,28,46,0.07)", padding: "16px 20px" }}
               >
-                <EyebrowLabel>Detalles</EyebrowLabel>
+                <EyebrowLabel>{t("detail.detailsTitle")}</EyebrowLabel>
                 <div className="mt-3" style={{ borderTop: `1px solid ${T.border}` }}>
-                  <DetailRow label="Referencia">{property.referenceCode ?? "—"}</DetailRow>
+                  <DetailRow label={t("detail.reference")}>{property.referenceCode ?? "—"}</DetailRow>
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Tipo"><span className="capitalize">{property.type}</span></DetailRow>
+                  <DetailRow label="Tipo"><span className="capitalize">{translatePropertyType(property.type, locale)}</span></DetailRow>
                   {orientationLabel(property.orientation) ? (
                     <>
                       <div style={{ height: 1, background: T.border }} />
-                      <DetailRow label="Orientación">{orientationLabel(property.orientation)}</DetailRow>
+                      <DetailRow label={t("detail.orientation")}>{orientationLabel(property.orientation)}</DetailRow>
                     </>
                   ) : null}
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Estado">{propertyStatusLabel(property.status)}</DetailRow>
+                  <DetailRow label="Estado">{propertyStatusLabel(property.status, locale)}</DetailRow>
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Actualizado">
+                  <DetailRow label={t("detail.updated")}>
                     <span className="inline-flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: T.gold }} strokeWidth={1.5} />
-                      {listingActivityLabel(property.listingUpdatedAt)}
+                      {listingActivityLabel(property.listingUpdatedAt, t, locale)}
                     </span>
                   </DetailRow>
                   {property.parkingSpaces !== undefined ? (
                     <>
                       <div style={{ height: 1, background: T.border }} />
-                      <DetailRow label="Estacionamiento">
+                      <DetailRow label={t("detail.parking")}>
                         <span className="inline-flex items-center gap-1.5">
                           <Car className="h-3.5 w-3.5" style={{ color: T.gold }} strokeWidth={1.5} />
                           {property.parkingSpaces}
@@ -1077,14 +1109,14 @@ export function PropertyDetailPage() {
                   {property.age !== undefined ? (
                     <>
                       <div style={{ height: 1, background: T.border }} />
-                      <DetailRow label="Antigüedad">{property.age === 0 ? "A estrenar" : `${property.age} años`}</DetailRow>
+                      <DetailRow label={t("detail.age")}>{property.age === 0 ? t("detail.brandNew") : `${property.age} años`}</DetailRow>
                     </>
                   ) : null}
                   {linkedDevelopment ? (
                     <>
                       <div style={{ height: 1, background: T.border }} />
                       <DetailRow label="Entrega">
-                        {formatDeliveryDateEs(linkedDevelopment.deliveryDate) || displayDeliveryDate(linkedDevelopment.deliveryDate)}
+                        {formatDeliveryDate(linkedDevelopment.deliveryDate, locale) || displayDeliveryDate(linkedDevelopment.deliveryDate)}
                       </DetailRow>
                     </>
                   ) : null}
@@ -1215,15 +1247,16 @@ function ContactSection({
   submitting: boolean; submitted: boolean; submitError: string | null;
   showGlobalWhatsappHint?: boolean; phoneInvalidHint?: string;
 }) {
+  const { t } = useLocale();
   const phoneDisplay = formatPhoneForDisplay(property.contactPhone?.trim() ?? "");
   const waDisplay    = whatsappDisplayLabel(property.contactWhatsapp);
 
   return (
     <div className="space-y-4">
       <div>
-        <EyebrowLabel>¿Te interesa?</EyebrowLabel>
+        <EyebrowLabel>{t("detail.interestedTitle")}</EyebrowLabel>
         <p className="mt-1.5 text-sm" style={{ color: T.muted, lineHeight: 1.6 }}>
-          Llama, escribe por WhatsApp o déjanos tus datos.
+          {t("detail.interestedBody")}
         </p>
       </div>
 
@@ -1237,7 +1270,7 @@ function ContactSection({
           >
             <span className="flex items-center gap-1.5">
               <Phone className="h-3.5 w-3.5" strokeWidth={2} />
-              Llamar
+              {t("contact.call")}
             </span>
             {phoneDisplay ? <span style={{ fontSize: "0.65rem", color: T.muted, fontWeight: 400 }}>{phoneDisplay}</span> : null}
           </a>
@@ -1247,7 +1280,7 @@ function ContactSection({
             style={{ padding: "11px 8px", borderRadius: 7, border: `1.5px dashed ${T.border}`, background: T.canvas, color: T.muted, cursor: "default" }}
             title={phoneInvalidHint ?? "Configura un teléfono en el admin"}
           >
-            <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={2} />Llamar</span>
+            <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={2} />{t("contact.call")}</span>
           </span>
         )}
         <a
@@ -1263,7 +1296,7 @@ function ContactSection({
       </div>
 
       {showGlobalWhatsappHint ? (
-        <p style={{ fontSize: "0.65rem", color: T.muted }}>WhatsApp: enlace global del sitio.</p>
+        <p style={{ fontSize: "0.65rem", color: T.muted }}>{t("detail.whatsappGlobal")}</p>
       ) : null}
 
       {/* Divider */}
@@ -1271,7 +1304,7 @@ function ContactSection({
         <GoldRule />
         <div className="absolute inset-0 flex items-center justify-center">
           <span style={{ background: T.white, padding: "0 10px", fontSize: "0.6rem", letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>
-            O completa el formulario
+            {t("detail.orFillForm")}
           </span>
         </div>
       </div>
@@ -1284,18 +1317,18 @@ function ContactSection({
       )}
       {submitted && (
         <div className="px-3 py-2.5 text-center text-xs" style={{ borderRadius: 6, border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.06)", color: "#15803d" }}>
-          ¡Mensaje enviado!
+          {t("detail.messageSent")}
         </div>
       )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-2.5">
         <div className="grid gap-2.5 sm:grid-cols-2">
-          <input type="text" name="name" required value={formData.name} onChange={handleChange} className="pd-input" placeholder="Nombre" autoComplete="name" />
-          <input type="tel" name="phone" required value={formData.phone} onChange={handleChange} className="pd-input" placeholder="Tu teléfono" autoComplete="tel" />
+          <input type="text" name="name" required value={formData.name} onChange={handleChange} className="pd-input" placeholder={t("form.name")} autoComplete="name" />
+          <input type="tel" name="phone" required value={formData.phone} onChange={handleChange} className="pd-input" placeholder={t("form.phone")} autoComplete="tel" />
         </div>
-        <input type="email" name="email" required value={formData.email} onChange={handleChange} className="pd-input" placeholder="Correo" autoComplete="email" />
-        <textarea name="message" value={formData.message} onChange={handleChange} rows={3} className="pd-input" style={{ resize: "none" }} placeholder="Mensaje (opcional)" />
+        <input type="email" name="email" required value={formData.email} onChange={handleChange} className="pd-input" placeholder={t("form.email")} autoComplete="email" />
+        <textarea name="message" value={formData.message} onChange={handleChange} rows={3} className="pd-input" style={{ resize: "none" }} placeholder={t("form.messageOptional")} />
         <button
           type="submit"
           disabled={submitting}
@@ -1311,7 +1344,7 @@ function ContactSection({
           }}
         >
           <Send className="h-3.5 w-3.5" strokeWidth={2} />
-          {submitting ? "Enviando…" : "Enviar consulta"}
+          {submitting ? t("form.sending") : t("detail.sendInquiry")}
         </button>
       </form>
     </div>

@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useLocale } from "../i18n/LocaleContext";
 import { cn } from "./ui/utils";
 import { foldFeatureLabel } from "../lib/featureIcons";
 
@@ -30,17 +31,20 @@ export function PropertyTypeFilterField({
   onChange,
   options,
   loading = false,
-  label = "Tipo",
+  label,
   labelClassName,
   inputClassName,
-  emptyOptionLabel = "Todos",
+  emptyOptionLabel,
 }: Props) {
+  const { t } = useLocale();
   const inputId = useId();
   const listboxId = `${inputId}-listbox`;
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
 
+  const fieldLabel = label ?? t("search.typeFieldLabel");
+  const allLabel = emptyOptionLabel ?? t("search.typeAll");
   const waiting = loading && options.length === 0;
   const trimmed = value.trim();
 
@@ -119,7 +123,7 @@ export function PropertyTypeFilterField({
     <div ref={rootRef} className="relative min-w-0 w-full">
       {labelClassName ? (
         <label className={labelClassName} htmlFor={inputId}>
-          {label}
+          {fieldLabel}
         </label>
       ) : null}
       <input
@@ -136,7 +140,7 @@ export function PropertyTypeFilterField({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
-        placeholder={waiting ? "Cargando tipos…" : `${emptyOptionLabel} o escribe un tipo…`}
+        placeholder={waiting ? t("search.typeLoading") : t("search.typePlaceholder")}
         disabled={waiting}
         autoComplete="off"
         spellCheck={false}
@@ -162,7 +166,7 @@ export function PropertyTypeFilterField({
                       highlight === idx && "bg-slate-100 font-medium text-slate-900"
                     )}
                   >
-                    {emptyOptionLabel}
+                    {allLabel}
                   </button>
                 </li>
               );

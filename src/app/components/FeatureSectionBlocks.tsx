@@ -1,6 +1,10 @@
+import { useMemo } from "react";
 import { Home, Package, Wrench } from "lucide-react";
 import { featureDisplayText, resolveFeatureIcon } from "../lib/featureDisplay";
 import { cn } from "./ui/utils";
+import { useLocale } from "../i18n/LocaleContext";
+import { translateCatalogFeature } from "../i18n/catalogTerms";
+import type { TranslationKey } from "../i18n/dictionaries";
 
 const CATEGORY_STYLES = {
   amenity: {
@@ -19,12 +23,15 @@ const CATEGORY_STYLES = {
 
 function FeatureRowVisual({
   feature,
+  display,
   cardIconClass,
 }: {
+  /** Término original en español: de él salen el icono y el emoji. */
   feature: string;
+  /** Texto ya traducido que se muestra. */
+  display: string;
   cardIconClass: string;
 }) {
-  const display = featureDisplayText(feature);
   const emojiMatch = feature.trim().match(/^(\p{Extended_Pictographic}+)\s+/u);
   const emoji = emojiMatch ? emojiMatch[1] : null;
   const ItemIcon = emoji ? null : resolveFeatureIcon(feature);
@@ -55,6 +62,18 @@ function FeatureRowVisual({
   );
 }
 
+/** Título por defecto de cada variante; el catálogo no usa otros. */
+const TITLE_KEY_BY_VARIANT = {
+  amenity: "catalog.amenities",
+  service: "catalog.services",
+  extra: "catalog.additionalFeatures",
+} as const satisfies Record<keyof typeof CATEGORY_STYLES, TranslationKey>;
+
+/**
+ * Punto único donde se traducen amenidades, servicios y características: todas
+ * las fichas renderizan estas listas por aquí, así que basta con interceptarlo
+ * en un sitio. Los términos desconocidos quedan en español (ver catalogTerms).
+ */
 export function FeatureSection({
   variant,
   title,
@@ -63,12 +82,29 @@ export function FeatureSection({
   layout = "grid",
 }: {
   variant: keyof typeof CATEGORY_STYLES;
-  title: string;
+  /** Solo si se necesita un encabezado distinto al de la variante. */
+  title?: string;
   items: string[];
   keyPrefix: string;
   layout?: "grid" | "list";
 }) {
-  if (items.length === 0) return null;
+  const { locale, t } = useLocale();
+  /**
+   * El icono se resuelve del término original: las reglas de `featureIcons` son
+   * regex en español (`alberca`, `cloaca`, `mascota`…), así que traducir antes
+   * dejaría las tarjetas sin icono. Se traduce solo el texto visible, ya sin el
+   * prefijo `#icono:` ni el emoji.
+   */
+  const entries = useMemo(
+    () =>
+      items.map((source) => ({
+        source,
+        display: translateCatalogFeature(featureDisplayText(source), locale),
+      })),
+    [items, locale],
+  );
+  if (entries.length === 0) return null;
+  const heading = title ?? t(TITLE_KEY_BY_VARIANT[variant]);
   const meta = CATEGORY_STYLES[variant];
   const SectionIcon = variant === "amenity" ? Home : variant === "service" ? Wrench : Package;
   return (
@@ -76,27 +112,26 @@ export function FeatureSection({
       <div className="mb-4 flex items-center gap-3">
         <SectionIcon className={cn("h-5 w-5 shrink-0", meta.sectionIcon)} strokeWidth={1.8} aria-hidden />
         <h4 className="text-base font-semibold text-slate-900" style={{ fontWeight: 600 }}>
-          {title}
+          {heading}
         </h4>
       </div>
       {layout === "list" ? (
         <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
-          {items.map((feature, idx) => (
+          {entries.map(({ source, display }, idx) => (
             <li
               key={`${keyPrefix}-${idx}`}
               className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-900"
             >
-              <FeatureRowVisual feature={feature} cardIconClass={meta.cardIcon} />
+              <FeatureRowVisual feature={source} display={display} cardIconClass={meta.cardIcon} />
             </li>
           ))}
         </ul>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {items.map((feature, idx) => {
-            const display = featureDisplayText(feature);
-            const emojiMatch = feature.trim().match(/^(\p{Extended_Pictographic}+)\s+/u);
+          {entries.map(({ source, display }, idx) => {
+            const emojiMatch = source.trim().match(/^(\p{Extended_Pictographic}+)\s+/u);
             const emoji = emojiMatch ? emojiMatch[1] : null;
-            const ItemIcon = emoji ? null : resolveFeatureIcon(feature);
+            const ItemIcon = emoji ? null : resolveFeatureIcon(source);
             return (
               <div
                 key={`${keyPrefix}-${idx}`}

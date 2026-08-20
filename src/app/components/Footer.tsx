@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useSiteContent } from "../../contexts/SiteContentContext";
+import { useLocale } from "../i18n/LocaleContext";
+import { localizeInternalHref } from "../i18n/locale";
 import { CONTACT_SOCIAL_LABELS, type ContactInfoIcon, type FooterNavLink } from "../../data/siteContent";
 import { footerServiceLinksFromCards } from "../../lib/footerSiteLinks";
 import { mergeSiteSection } from "../../lib/siteContentMerge";
@@ -92,6 +94,7 @@ function resolveFooterCopyright(line: string) {
 }
 
 function FooterNavItem({ link }: { link: FooterNavLink }) {
+  const { locale } = useLocale();
   const href = link.href.trim() || "#";
   const className =
     "hover:text-white hover:translate-x-1 transition-all duration-200 inline-block";
@@ -99,7 +102,7 @@ function FooterNavItem({ link }: { link: FooterNavLink }) {
 
   if (href.startsWith("/")) {
     return (
-      <Link to={href} className={className} style={style}>
+      <Link to={localizeInternalHref(href, locale)} className={className} style={style}>
         {link.label}
       </Link>
     );

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useLocale } from "../i18n/LocaleContext";
 import { useSearchParams } from "react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { Header } from "../components/Header";
@@ -56,6 +57,7 @@ function PropertyGridSkeleton() {
 }
 
 export function SalePage() {
+  const { t } = useLocale();
   const reduceMotion = useReducedMotion();
   const pl = usePreviewLayout();
   const { content } = useSiteContent();
@@ -342,7 +344,9 @@ export function SalePage() {
                 <p className="font-heading text-sm font-medium text-brand-navy/90 not-italic">
                   {loading
                     ? "Cargando propiedades..."
-                    : `${displayedProperties.length} propiedad${displayedProperties.length !== 1 ? "es" : ""} disponible${displayedProperties.length !== 1 ? "s" : ""}`}
+                    : (displayedProperties.length === 1
+                        ? t("search.resultsCountOne")
+                        : t("search.resultsCount", { count: displayedProperties.length }))}
                 </p>
               </div>
             )}
@@ -396,9 +400,9 @@ export function SalePage() {
                   onChange={(e) => setSortBy(e.target.value as CatalogPropertySortKey)}
                   className="font-heading rounded-lg border border-brand-navy/15 bg-white px-4 py-2 text-sm font-normal text-brand-navy not-italic transition-shadow duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
-                  {CATALOG_PROPERTY_SORT_OPTIONS.map(({ value, label }) => (
+                  {CATALOG_PROPERTY_SORT_OPTIONS.map(({ value, labelKey }) => (
                     <option key={value} value={value}>
-                      {label}
+                      {t(labelKey)}
                     </option>
                   ))}
                 </select>

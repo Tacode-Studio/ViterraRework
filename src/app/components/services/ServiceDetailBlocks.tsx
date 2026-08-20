@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { LocaleLink as Link } from "../LocaleLink";
 import {
   MapPin,
   Phone,

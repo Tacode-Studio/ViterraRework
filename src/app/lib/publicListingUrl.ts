@@ -54,9 +54,14 @@ export function developmentPublicUrl(
  * Añade el enlace de la ficha al final del mensaje de WhatsApp para que el
  * asesor identifique de inmediato la propiedad o desarrollo en cuestión.
  */
-export function appendListingLinkToMessage(message: string, url: string | undefined | null): string {
+export function appendListingLinkToMessage(
+  message: string,
+  url: string | undefined | null,
+  label = "Ficha",
+): string {
   const body = message.trim();
   const link = url?.trim();
   if (!link) return body;
-  return body ? `${body}\n\nFicha: ${link}` : `Ficha: ${link}`;
+  const line = `${label.trim() || "Ficha"}: ${link}`;
+  return body ? `${body}\n\n${line}` : line;
 }

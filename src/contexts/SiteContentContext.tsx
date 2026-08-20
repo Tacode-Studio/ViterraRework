@@ -16,6 +16,7 @@ import {
 } from "../app/lib/supabaseSiteContent";
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "../data/siteContent";
 import { mergeSiteSection } from "../lib/siteContentMerge";
+import { DEFAULT_LOCALE, localeFromPathname, type Locale } from "../app/i18n/locale";
 
 export type SiteContentSyncState = "idle" | "syncing" | "synced" | "error";
 
@@ -24,6 +25,14 @@ type SiteContentContextValue = {
   loading: boolean;
   error: string | null;
   syncState: SiteContentSyncState;
+  /** Idioma cuyo contenido está cargado. */
+  locale: Locale;
+  /**
+   * Cambia el idioma del contenido. El provider vive por encima del router
+   * (envuelve a `RouterProvider`), así que no puede leer la ruta por sí mismo:
+   * `SiteContentLocaleSync` se lo informa desde dentro del árbol de rutas.
+   */
+  setLocale: (locale: Locale) => void;
   /** Reemplaza una sección completa (tras editar en admin) */
   setSection: <K extends keyof SiteContent>(key: K, section: SiteContent[K]) => void;
   /** Fusiona parcialmente una sección */
@@ -166,15 +175,25 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SiteContentSyncState>("idle");
+  /**
+   * Se inicializa desde la URL real para acertar en la primera carga y no
+   * disparar dos fetches al abrir directamente una página en inglés.
+   */
+  const [locale, setLocale] = useState<Locale>(() =>
+    typeof window !== "undefined" ? localeFromPathname(window.location.pathname) : DEFAULT_LOCALE
+  );
 
   const contentRef = useRef(content);
   useEffect(() => {
     contentRef.current = content;
   }, [content]);
 
-  const persistTimersRef = useRef<Partial<Record<keyof SiteContent, ReturnType<typeof setTimeout>>>>(
-    {}
-  );
+  const localeRef = useRef(locale);
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
+
+  const persistTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     return () => {
@@ -188,17 +207,21 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
     const client = getSupabaseClient();
     if (!client) return;
 
-    const prev = persistTimersRef.current[key];
+    /** El temporizador se indexa por página e idioma: editar ES y EN de la
+     * misma página en rápida sucesión no debe cancelar el guardado del otro. */
+    const targetLocale = localeRef.current;
+    const timerKey = `${key}:${targetLocale}`;
+    const prev = persistTimersRef.current[timerKey];
     if (prev) clearTimeout(prev);
 
-    persistTimersRef.current[key] = setTimeout(() => {
-      delete persistTimersRef.current[key];
+    persistTimersRef.current[timerKey] = setTimeout(() => {
+      delete persistTimersRef.current[timerKey];
       void (async () => {
         const c = getSupabaseClient();
         if (!c) return;
         const section = contentRef.current[key];
         setSyncState("syncing");
-        const { error: upErr } = await upsertSiteSection(c, key, section);
+        const { error: upErr } = await upsertSiteSection(c, key, section, targetLocale);
         if (upErr) {
           setError(upErr.message);
           setSyncState("error");
@@ -221,9 +244,9 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
 
-    void (async () => {
+    const load = async () => {
       try {
-        const merged = normalizeLegacyContact(await fetchAllSiteSections(client));
+        const merged = normalizeLegacyContact(await fetchAllSiteSections(client, locale));
         if (!cancelled) {
           setContent(merged);
           setError(null);
@@ -236,21 +259,39 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+
+    void load();
 
     const channel = client
-      .channel("site_content_sections_changes")
+      .channel(`site_content_sections_changes_${locale}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "site_content_sections" },
         (payload) => {
           if (payload.eventType === "DELETE") return;
-          const row = payload.new as { page?: keyof SiteContent; payload?: unknown } | null;
+          const row = payload.new as
+            | { page?: keyof SiteContent; locale?: string | null; payload?: unknown }
+            | null;
           if (!row?.page || typeof row.payload === "undefined") return;
-          setContent((prev) => ({
-            ...prev,
-            [row.page!]: mergeSiteSection(row.page!, row.payload),
-          }));
+          const rowLocale = (row.locale?.trim() || DEFAULT_LOCALE) as Locale;
+
+          /* Viendo el idioma por defecto, su propia fila se aplica directo. */
+          if (locale === DEFAULT_LOCALE) {
+            if (rowLocale !== DEFAULT_LOCALE) return;
+            setContent((prev) => ({
+              ...prev,
+              [row.page!]: mergeSiteSection(row.page!, row.payload),
+            }));
+            return;
+          }
+
+          /*
+           * En un idioma traducido el valor visible depende de dos filas (la
+           * base y la traducción), así que no se puede recomponer desde este
+           * único evento: se recarga.
+           */
+          if (rowLocale === locale || rowLocale === DEFAULT_LOCALE) void load();
         }
       )
       .subscribe();
@@ -259,7 +300,7 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       void client.removeChannel(channel);
     };
-  }, []);
+  }, [locale]);
 
   const setSection = useCallback(
     <K extends keyof SiteContent>(key: K, section: SiteContent[K]) => {
@@ -298,7 +339,7 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       return;
     }
     setSyncState("syncing");
-    const { error: upErr } = await upsertAllDefaultSections(client, normalized);
+    const { error: upErr } = await upsertAllDefaultSections(client, normalized, localeRef.current);
     if (upErr) {
       setError(upErr.message);
       setSyncState("error");
@@ -316,11 +357,13 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       syncState,
+      locale,
+      setLocale,
       setSection,
       patchSection,
       resetToDefaults,
     }),
-    [content, loading, error, syncState, setSection, patchSection, resetToDefaults]
+    [content, loading, error, syncState, locale, setSection, patchSection, resetToDefaults]
   );
 
   return <SiteContentContext.Provider value={value}>{children}</SiteContentContext.Provider>;
@@ -349,4 +392,17 @@ export function useSiteContent() {
   const ctx = useContext(SiteContentContext);
   if (!ctx) throw new Error("useSiteContent debe usarse dentro de SiteContentProvider");
   return ctx;
+}
+
+/**
+ * Informa al provider el idioma de la ruta actual. Va dentro del árbol de
+ * rutas porque `SiteContentProvider` envuelve a `RouterProvider` y no puede
+ * leer la ubicación por sí mismo. No renderiza nada.
+ */
+export function SiteContentLocaleSync({ locale }: { locale: Locale }) {
+  const { locale: current, setLocale } = useSiteContent();
+  useEffect(() => {
+    if (current !== locale) setLocale(locale);
+  }, [current, locale, setLocale]);
+  return null;
 }

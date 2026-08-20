@@ -5,6 +5,7 @@ import React from "react";
 import { Header } from "../../../app/components/Header";
 import { Footer } from "../../../app/components/Footer";
 import { SiteContentProvider } from "../../../contexts/SiteContentContext";
+import { LocaleProvider } from "../../../app/i18n/LocaleContext";
 import * as supabaseClientModule from "../../../app/lib/supabaseClient";
 
 describe("Header & Footer components", () => {
@@ -15,7 +16,9 @@ describe("Header & Footer components", () => {
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <MemoryRouter>
-      <SiteContentProvider>{children}</SiteContentProvider>
+      <LocaleProvider>
+        <SiteContentProvider>{children}</SiteContentProvider>
+      </LocaleProvider>
     </MemoryRouter>
   );
 

@@ -1,6 +1,8 @@
 import { ChevronDown, Search } from "lucide-react";
 import { useState, useEffect, useMemo, useRef, useId } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
+import { LocaleLink as Link } from "./LocaleLink";
+import { useLocale } from "../i18n/LocaleContext";
 import { usePreviewCanvas } from "../../contexts/PreviewCanvasContext";
 import { cn } from "./ui/utils";
 import {
@@ -74,6 +76,7 @@ export function SearchBar({
 }: SearchBarProps) {
   const { types: propertyTypeOptions, loading: propertyTypesLoading } =
     useTokkoPropertyTypes(extraPropertyTypes);
+  const { t } = useLocale();
   const previewCanvas = usePreviewCanvas();
   const [searchParams] = useSearchParams();
   const advancedToggleId = useId();
@@ -274,10 +277,10 @@ export function SearchBar({
       >
         {showPriceOperationToggle ? (
           <div className="min-w-0 w-full">
-            <label className={labelClass}>Operación</label>
+            <label className={labelClass}>{t("search.operationLabel")}</label>
             <div
               role="group"
-              aria-label="Venta o alquiler"
+              aria-label={t("search.operationGroupLabel")}
               className={cn(
                 "flex w-full rounded-xl border p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.12)]",
                 !previewCanvas && !compactAmbient && "max-w-md",
@@ -301,7 +304,7 @@ export function SearchBar({
                       : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Venta
+                {t("search.operationSale")}
               </button>
               <button
                 type="button"
@@ -317,17 +320,17 @@ export function SearchBar({
                       : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                Renta
+                {t("search.operationRent")}
               </button>
             </div>
           </div>
         ) : null}
 
         <div className={cn("min-w-0 w-full", !previewCanvas && "lg:min-w-[12rem]")}>
-          <label className={labelClass}>Ubicación o palabra clave</label>
+          <label className={labelClass}>{t("search.locationFieldLabel")}</label>
           <input
             type="text"
-            placeholder="Ej: Zapopan, San Javier…"
+            placeholder={t("search.locationPlaceholder")}
             value={filters.query}
             onChange={(e) => setFilters({ ...filters, query: e.target.value })}
             className={fieldClass}
@@ -347,7 +350,7 @@ export function SearchBar({
 
         {showStatusFilter ? (
           <div className="min-w-0 w-full">
-            <label className={labelClass}>Estado</label>
+            <label className={labelClass}>{t("search.statusLabel")}</label>
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
@@ -357,9 +360,9 @@ export function SearchBar({
               )}
               style={selectChevronStyle}
             >
-              <option value="">Todos</option>
-              <option value="venta">Venta</option>
-              <option value="alquiler">Renta</option>
+              <option value="">{t("search.typeAll")}</option>
+              <option value="venta">{t("search.operationSale")}</option>
+              <option value="alquiler">{t("search.operationRent")}</option>
             </select>
           </div>
         ) : null}
@@ -372,11 +375,11 @@ export function SearchBar({
           )}
         >
           <label className={cn(labelClass, "text-transparent", compactAmbient && "max-lg:hidden")} aria-hidden="true">
-            Buscar
+            {t("search.submit")}
           </label>
           <button type="submit" className={cn(btnClass, "lg:w-full min-w-0")}>
             <Search className={cn("h-5 w-5 shrink-0", isAmbient ? "opacity-80" : "opacity-95")} strokeWidth={1.5} aria-hidden />
-            <span>Buscar</span>
+            <span>{t("search.submit")}</span>
           </button>
         </div>
       </div>
@@ -402,7 +405,7 @@ export function SearchBar({
                 : "border-slate-400 text-slate-600 hover:border-primary hover:text-primary"
             )}
           >
-            {advancedOpen ? "Ocultar filtros avanzados" : "Filtros avanzados"}
+            {advancedOpen ? t("search.hideAdvanced") : t("search.showAdvanced")}
             <ChevronDown
               className={cn("h-3.5 w-3.5 shrink-0 transition-transform duration-200", advancedOpen && "rotate-180")}
               aria-hidden
@@ -516,7 +519,7 @@ export function SearchBar({
                 )}
               >
                 <div>
-                  <label className={labelClass}>Precio mínimo (MXN)</label>
+                  <label className={labelClass}>{t("search.minPrice")}</label>
                   <input
                     type="number"
                     placeholder="Ej. 500000"
@@ -526,7 +529,7 @@ export function SearchBar({
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Precio máximo (MXN)</label>
+                  <label className={labelClass}>{t("search.maxPrice")}</label>
                   <input
                     type="number"
                     placeholder="Ej. 15000000"
@@ -569,7 +572,7 @@ export function SearchBar({
                 !isPremium && !isAmbient && "border-slate-400 group-hover:border-primary group-hover:text-primary"
               )}
             >
-              Explorar en mapa
+              {t("search.exploreMap")}
             </span>
           </Link>
         </div>

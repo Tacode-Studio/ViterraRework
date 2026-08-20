@@ -1,3 +1,4 @@
+import type { TranslationKey } from "../i18n/dictionaries";
 import type { Property } from "../components/PropertyCard";
 
 /** Clave de ordenación del catálogo (público y admin). */
@@ -63,18 +64,23 @@ export function sortCatalogProperties(
   return next;
 }
 
-/** Opciones de `<select>` compartidas (landing y admin). */
+/**
+ * Opciones de `<select>` compartidas (landing y admin).
+ * `label` es el texto en español que usa el admin —que no se traduce—; las
+ * páginas públicas renderizan `t(labelKey)` para seguir el idioma activo.
+ */
 export const CATALOG_PROPERTY_SORT_OPTIONS: {
   value: CatalogPropertySortKey;
   label: string;
+  labelKey: TranslationKey;
 }[] = [
-  { value: "newest", label: "Más recientes" },
-  { value: "price-low", label: "Precio: menor a mayor" },
-  { value: "price-high", label: "Precio: mayor a menor" },
-  { value: "area-small", label: "Área: menor a mayor" },
-  { value: "area-large", label: "Área: mayor a menor" },
-  { value: "bedrooms-low", label: "Recámaras: menor a mayor" },
-  { value: "bedrooms-high", label: "Recámaras: mayor a menor" },
-  { value: "bathrooms-low", label: "Baños: menor a mayor" },
-  { value: "bathrooms-high", label: "Baños: mayor a menor" },
+  { value: "newest", label: "Más recientes", labelKey: "sort.newest" },
+  { value: "price-low", label: "Precio: menor a mayor", labelKey: "sort.priceAsc" },
+  { value: "price-high", label: "Precio: mayor a menor", labelKey: "sort.priceDesc" },
+  { value: "area-small", label: "Área: menor a mayor", labelKey: "sort.areaAsc" },
+  { value: "area-large", label: "Área: mayor a menor", labelKey: "sort.areaDesc" },
+  { value: "bedrooms-low", label: "Recámaras: menor a mayor", labelKey: "sort.bedroomsAsc" },
+  { value: "bedrooms-high", label: "Recámaras: mayor a menor", labelKey: "sort.bedroomsDesc" },
+  { value: "bathrooms-low", label: "Baños: menor a mayor", labelKey: "sort.bathroomsAsc" },
+  { value: "bathrooms-high", label: "Baños: mayor a menor", labelKey: "sort.bathroomsDesc" },
 ];

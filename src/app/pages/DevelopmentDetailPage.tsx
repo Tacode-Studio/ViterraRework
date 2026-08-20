@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, Link } from "react-router";
+import { useParams } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import {
@@ -39,6 +40,9 @@ import {
 import { resolveTelHref, formatPhoneForDisplay } from "../lib/phoneLink";
 import { resolveWhatsappHref, whatsappDisplayLabel } from "../lib/whatsappLink";
 import { appendListingLinkToMessage, developmentPublicUrl } from "../lib/publicListingUrl";
+import { useLocale } from "../i18n/LocaleContext";
+import { translateDevelopmentStatus, translatePropertyType } from "../i18n/catalogTerms";
+import type { TranslationKey } from "../i18n/dictionaries";
 import { useSiteContent } from "../../contexts/SiteContentContext";
 import { mergeSiteSection } from "../../lib/siteContentMerge";
 import { PropertyVideoPlayer } from "../components/PropertyVideoPlayer";
@@ -109,12 +113,20 @@ function propertyCardHeadline(p: Property) {
   return p.publicationTitle?.trim() || p.title;
 }
 
-function developmentContactMessage(dev: { id?: string; tokkoId?: string; name: string; referenceCode?: string }, extra: string): string {
+function developmentContactMessage(
+  dev: { id?: string; tokkoId?: string; name: string; referenceCode?: string },
+  extra: string,
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string,
+): string {
   const ref = dev.referenceCode?.trim();
-  const parts = [`Hola, me interesa el desarrollo ${dev.name}.`];
-  if (ref) parts.push(`Referencia: ${ref}.`);
+  const parts = [t("wa.developmentInterest", { name: dev.name })];
+  if (ref) parts.push(t("wa.reference", { code: ref }));
   parts.push(extra);
-  return appendListingLinkToMessage(parts.join(" "), developmentPublicUrl(dev.id, dev.tokkoId));
+  return appendListingLinkToMessage(
+    parts.join(" "),
+    developmentPublicUrl(dev.id, dev.tokkoId),
+    t("wa.listingLabel"),
+  );
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
@@ -122,6 +134,7 @@ export function DevelopmentDetailPage() {
   const { id } = useParams();
   const { development, linkedProperties, loading, error } = useDevelopmentDetail(id);
   const { content } = useSiteContent();
+  const { t, locale } = useLocale();
   const contactSite = mergeSiteSection("contact", content.contact);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<DevelopmentDetailTabId>("descripcion");
@@ -200,8 +213,8 @@ export function DevelopmentDetailPage() {
     return development.referenceCode?.trim() || previewDevelopmentReferenceCode(development.referenceCode, development.tokkoId, development.id);
   }, [development]);
 
-  const whatsappInterestMessage = useMemo(() => development ? developmentContactMessage({ id: development.id, tokkoId: development.tokkoId, name: development.name, referenceCode: displayReference }, "¿Podrían darme más información?") : "", [development, displayReference]);
-  const whatsappVisitMessage    = useMemo(() => development ? developmentContactMessage({ id: development.id, tokkoId: development.tokkoId, name: development.name, referenceCode: displayReference }, "Me gustaría agendar una visita.") : "", [development, displayReference]);
+  const whatsappInterestMessage = useMemo(() => development ? developmentContactMessage({ id: development.id, tokkoId: development.tokkoId, name: development.name, referenceCode: displayReference }, t("wa.moreInfo"), t) : "", [development, displayReference, t]);
+  const whatsappVisitMessage    = useMemo(() => development ? developmentContactMessage({ id: development.id, tokkoId: development.tokkoId, name: development.name, referenceCode: displayReference }, t("wa.scheduleVisit"), t) : "", [development, displayReference, t]);
   const whatsappContactHref = useMemo(() => resolveWhatsappHref(undefined, siteWhatsappFallback, whatsappInterestMessage), [siteWhatsappFallback, whatsappInterestMessage]);
   const whatsappVisitHref   = useMemo(() => resolveWhatsappHref(undefined, siteWhatsappFallback, whatsappVisitMessage), [siteWhatsappFallback, whatsappVisitMessage]);
   const waDisplay = "(33) 1445 7122";
@@ -212,10 +225,10 @@ export function DevelopmentDetailPage() {
   const contactAdvisorExternal = contactAdvisorHref.startsWith("http") || contactAdvisorHref.startsWith("tel:");
 
   const detailTabs = useMemo(() => {
-    const tabs: Array<{ id: DevelopmentDetailTabId; label: string }> = [{ id: "descripcion", label: "Descripción" }];
+    const tabs: Array<{ id: DevelopmentDetailTabId; label: string }> = [{ id: "descripcion", label: t("detail.tabDescription") }];
     if (hasVideo)  tabs.push({ id: "video",  label: resolvedVideos.length  > 1 ? `Videos (${resolvedVideos.length})`          : "Video" });
     if (hasTour3d) tabs.push({ id: "tour3d", label: resolvedTours3d.length > 1 ? `Recorridos 3D (${resolvedTours3d.length})` : "Recorrido 3D" });
-    tabs.push({ id: "caracteristicas", label: "Características" }, { id: "unidades", label: "Unidades" }, { id: "ubicacion", label: "Ubicación" });
+    tabs.push({ id: "caracteristicas", label: t("detail.tabFeatures") }, { id: "unidades", label: t("detail.units") }, { id: "ubicacion", label: t("detail.tabLocation") });
     return tabs;
   }, [hasVideo, hasTour3d, resolvedVideos.length, resolvedTours3d.length]);
 
@@ -233,7 +246,7 @@ export function DevelopmentDetailPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitError(null);
     const client = getSupabaseClient();
-    if (!client) { setSubmitError("No hay conexión al servidor."); return; }
+    if (!client) { setSubmitError(t("common.noConnection")); return; }
     setSubmitting(true);
     try {
       const { error: rpcErr } = await submitCatalogLeadViaRpc(client, { name: formData.name, email: formData.email, phone: formData.phone, message: formData.message, developmentId: development!.id });
@@ -278,7 +291,7 @@ export function DevelopmentDetailPage() {
               {error ? "No se pudo cargar el desarrollo" : "Desarrollo no encontrado"}
             </h1>
             {error ? <p className="mb-4 text-sm" style={{ color: T.muted }}>{error}</p> : null}
-            <Link to="/desarrollos" className="font-medium transition-colors" style={{ color: T.gold }}>Volver a desarrollos</Link>
+            <Link to="/desarrollos" className="font-medium transition-colors" style={{ color: T.gold }}>{t("detail.backToDevelopments")}</Link>
           </div>
         </div>
         <Footer />
@@ -430,10 +443,10 @@ export function DevelopmentDetailPage() {
                 {/* Status badges */}
                 <div className="absolute top-4 left-4 flex flex-wrap gap-1.5">
                   <span style={{ padding: "4px 11px", borderRadius: 4, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.borderGold}`, fontSize: "0.62rem", letterSpacing: "0.14em", fontWeight: 700, color: T.gold, textTransform: "uppercase" }}>
-                    {development.status}
+                    {translateDevelopmentStatus(development.status, locale)}
                   </span>
                   <span style={{ padding: "4px 11px", borderRadius: 4, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}`, fontSize: "0.62rem", letterSpacing: "0.1em", fontWeight: 600, color: T.navy, textTransform: "uppercase" }}>
-                    {development.type}
+                    {translatePropertyType(development.type, locale)}
                   </span>
                 </div>
 
@@ -443,7 +456,7 @@ export function DevelopmentDetailPage() {
                     style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Maximize2 className="w-3.5 h-3.5" style={{ color: T.navy }} strokeWidth={1.5} />
                   </button>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); void handleShare(); }} aria-label="Copiar enlace de la publicación"
+                  <button type="button" onClick={(e) => { e.stopPropagation(); void handleShare(); }} aria-label={t("detail.copyLink")}
                     style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Share2 className="w-3.5 h-3.5" style={{ color: T.navy }} strokeWidth={1.5} />
                   </button>
@@ -545,7 +558,7 @@ export function DevelopmentDetailPage() {
                             style={{ color: T.gold, fontWeight: 700 }}
                             aria-expanded={descriptionExpanded}
                           >
-                            {descriptionExpanded ? "Ver menos" : "Ver más"}
+                            {descriptionExpanded ? t("common.seeLess") : t("common.seeMore")}
                           </button>
                         ) : null}
                       </div>
@@ -593,9 +606,9 @@ export function DevelopmentDetailPage() {
                       <div className="space-y-8">
                         {development.amenities.length + development.services.length + development.additionalFeatures.length > 0 ? (
                           <div className="space-y-7 dd-features">
-                            <FeatureSection variant="amenity" title="Amenidades" items={development.amenities} keyPrefix="dev-am" />
-                            <FeatureSection variant="service" title="Servicios" items={development.services} keyPrefix="dev-sv" />
-                            <FeatureSection variant="extra" title="Características adicionales" items={development.additionalFeatures} keyPrefix="dev-af" />
+                            <FeatureSection variant="amenity" items={development.amenities} keyPrefix="dev-am" />
+                            <FeatureSection variant="service" items={development.services} keyPrefix="dev-sv" />
+                            <FeatureSection variant="extra" items={development.additionalFeatures} keyPrefix="dev-af" />
                           </div>
                         ) : (
                           <div className="px-5 py-10 text-center" style={{ borderRadius: 8, border: `1px dashed ${T.border}`, background: T.canvas }}>
@@ -611,7 +624,7 @@ export function DevelopmentDetailPage() {
                         {development.developmentUnits.length > 0 || linkedProperties.length > 0 ? (
                           <div className="space-y-4">
                             <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-base font-semibold" style={{ color: T.navy, fontWeight: 700 }}>Unidades disponibles</h3>
+                              <h3 className="text-base font-semibold" style={{ color: T.navy, fontWeight: 700 }}>{t("detail.availableUnits")}</h3>
                               <span className="text-xs" style={{ color: T.muted, fontWeight: 600, letterSpacing: "0.08em" }}>
                                 {development.developmentUnits.length + linkedProperties.length} en total
                               </span>
@@ -621,7 +634,7 @@ export function DevelopmentDetailPage() {
                             {development.developmentUnits.length > 0 && (
                               <div className="space-y-3">
                                 {linkedProperties.length > 0 && (
-                                  <EyebrowLabel>Tipologías (inventario manual)</EyebrowLabel>
+                                  <EyebrowLabel>{t("detail.unitTypes")}</EyebrowLabel>
                                 )}
                                 {development.developmentUnits.map((unit, idx) => (
                                   <div key={`u-${idx}`} style={{ padding: 16, background: T.canvas, borderRadius: 8, border: `1px solid ${T.border}` }}>
@@ -642,7 +655,7 @@ export function DevelopmentDetailPage() {
                                       </div>
                                       <div className="flex items-center gap-2" style={{ color: T.body }}>
                                         <Car className="w-4 h-4 shrink-0" style={{ color: T.gold }} strokeWidth={1.5} />
-                                        <span style={{ fontWeight: 500 }}>{unit.parking ? "Sí" : "No"}</span>
+                                        <span style={{ fontWeight: 500 }}>{unit.parking ? t("common.yes") : t("common.no")}</span>
                                       </div>
                                       <div className="flex items-center gap-2" style={{ color: T.body }}>
                                         <Home className="w-4 h-4 shrink-0" style={{ color: T.gold }} strokeWidth={1.5} />
@@ -658,7 +671,7 @@ export function DevelopmentDetailPage() {
                             {linkedProperties.length > 0 && (
                               <div className="space-y-3">
                                 {development.developmentUnits.length > 0 && (
-                                  <EyebrowLabel>Unidades en catálogo (propiedades vinculadas)</EyebrowLabel>
+                                  <EyebrowLabel>{t("detail.linkedUnits")}</EyebrowLabel>
                                 )}
                                 {linkedProperties.map((p) => (
                                   <Link
@@ -751,7 +764,7 @@ export function DevelopmentDetailPage() {
                           {(["map", "satellite"] as const).map((mode) => (
                             <button key={mode} type="button" onClick={() => setMapViewMode(mode)} className="text-xs transition-all"
                               style={{ padding: "5px 14px", borderRadius: 5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", border: mapViewMode === mode ? `1px solid ${T.gold}` : `1px solid ${T.border}`, background: mapViewMode === mode ? T.goldFaint : T.white, color: mapViewMode === mode ? T.gold : T.muted }}>
-                              {mode === "map" ? "Mapa" : "Satélite"}
+                              {mode === "map" ? "Mapa" : t("map.satellite")}
                             </button>
                           ))}
                         </div>
@@ -821,7 +834,7 @@ export function DevelopmentDetailPage() {
 
                 {/* Price */}
                 <div className="mb-5">
-                  <EyebrowLabel>Desde</EyebrowLabel>
+                  <EyebrowLabel>{t("detail.priceFrom")}</EyebrowLabel>
                   <p className="mt-1" style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(1.5rem, 3vw, 2rem)", fontWeight: 700, color: T.navy, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
                     {(development.priceRange ?? "").split(" - ")[0]?.trim() || development.priceRange || "—"}
                   </p>
@@ -833,9 +846,9 @@ export function DevelopmentDetailPage() {
                 {/* Stats bar */}
                 <div className="grid grid-cols-3" style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", background: T.canvas }}>
                   {[
-                    { icon: <Building2 className="w-4 h-4" strokeWidth={1.4} />, value: development.units, label: "Unidades" },
-                    { icon: <Home className="w-4 h-4" strokeWidth={1.4} />, value: development.type, label: "Tipo" },
-                    { icon: <Calendar className="w-4 h-4" strokeWidth={1.4} />, value: displayDeliveryDate(development.deliveryDate), label: "Entrega" },
+                    { icon: <Building2 className="w-4 h-4" strokeWidth={1.4} />, value: development.units, label: t("detail.units") },
+                    { icon: <Home className="w-4 h-4" strokeWidth={1.4} />, value: translatePropertyType(development.type, locale), label: t("search.typeFieldLabel") },
+                    { icon: <Calendar className="w-4 h-4" strokeWidth={1.4} />, value: displayDeliveryDate(development.deliveryDate), label: t("detail.delivery") },
                   ].map((stat, i) => (
                     <div key={i} className="flex flex-col items-center py-4 px-2" style={{ borderRight: i < 2 ? `1px solid ${T.borderGold}` : undefined }}>
                       <span style={{ color: T.gold, marginBottom: 5 }}>{stat.icon}</span>
@@ -859,7 +872,7 @@ export function DevelopmentDetailPage() {
               >
                 {development.inChargeName?.trim() ? (
                   <p className="text-xs mb-3" style={{ color: T.muted }}>
-                    <span style={{ color: T.navy, fontWeight: 600 }}>Asesor: </span>
+                    <span style={{ color: T.navy, fontWeight: 600 }}>{t("detail.advisor")}: </span>
                     {development.inChargeName.trim()}
                   </p>
                 ) : null}
@@ -867,23 +880,23 @@ export function DevelopmentDetailPage() {
                   {scheduleVisitExternal ? (
                     <a href={scheduleVisitHref} target={scheduleVisitHref.startsWith("http") ? "_blank" : undefined} rel={scheduleVisitHref.startsWith("http") ? "noopener noreferrer" : undefined}
                       className="dd-btn-primary">
-                      Agendar visita
+                      {t("detail.scheduleVisit")}
                     </a>
                   ) : (
                     <Link to={scheduleVisitHref}
                       className="dd-btn-primary">
-                      Agendar visita
+                      {t("detail.scheduleVisit")}
                     </Link>
                   )}
                   {contactAdvisorExternal ? (
                     <a href={contactAdvisorHref} target={contactAdvisorHref.startsWith("http") ? "_blank" : undefined} rel={contactAdvisorHref.startsWith("http") ? "noopener noreferrer" : undefined}
                       className="dd-btn-secondary">
-                      Contactar asesor
+                      {t("detail.contactAdvisor")}
                     </a>
                   ) : (
                     <Link to={contactAdvisorHref}
                       className="dd-btn-secondary">
-                      Contactar asesor
+                      {t("detail.contactAdvisor")}
                     </Link>
                   )}
                 </div>
@@ -896,23 +909,23 @@ export function DevelopmentDetailPage() {
                 transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
                 style={{ borderRadius: 12, background: T.white, boxShadow: "0 2px 16px rgba(20,28,46,0.07)", padding: "16px 20px" }}
               >
-                <EyebrowLabel>Detalles</EyebrowLabel>
+                <EyebrowLabel>{t("detail.detailsTitle")}</EyebrowLabel>
                 <div className="mt-3" style={{ borderTop: `1px solid ${T.border}` }}>
-                  <DetailRow label="Referencia">{displayReference || "—"}</DetailRow>
+                  <DetailRow label={t("detail.reference")}>{displayReference || "—"}</DetailRow>
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Tipo"><span className="capitalize">{development.type}</span></DetailRow>
+                  <DetailRow label={t("search.typeFieldLabel")}><span className="capitalize">{translatePropertyType(development.type, locale)}</span></DetailRow>
                   {development.colony ? (
                     <>
                       <div style={{ height: 1, background: T.border }} />
-                      <DetailRow label="Colonia">{development.colony}</DetailRow>
+                      <DetailRow label={t("detail.neighborhood")}>{development.colony}</DetailRow>
                     </>
                   ) : null}
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Estado">{development.status}</DetailRow>
+                  <DetailRow label={t("search.statusLabel")}>{translateDevelopmentStatus(development.status, locale)}</DetailRow>
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Unidades">{development.units}</DetailRow>
+                  <DetailRow label={t("detail.units")}>{development.units}</DetailRow>
                   <div style={{ height: 1, background: T.border }} />
-                  <DetailRow label="Entrega">
+                  <DetailRow label={t("detail.delivery")}>
                     <span className="inline-flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: T.gold }} strokeWidth={1.5} />
                       {displayDeliveryDate(development.deliveryDate)}
@@ -1029,10 +1042,11 @@ function DevContactSection({
   submitting: boolean; submitted: boolean; submitError: string | null;
   showGlobalWhatsappHint?: boolean;
 }) {
+  const { t, locale } = useLocale();
   return (
     <div className="space-y-4">
       <div>
-        <EyebrowLabel>¿Te interesa este desarrollo?</EyebrowLabel>
+        <EyebrowLabel>{t("detail.interestedDevelopment")}</EyebrowLabel>
         <p className="mt-1.5 text-sm" style={{ color: T.muted, lineHeight: 1.6 }}>
           Llama, escribe por WhatsApp o déjanos tus datos.
         </p>
@@ -1042,14 +1056,14 @@ function DevContactSection({
         {telContactHref ? (
           <a href={telContactHref} className="flex flex-col items-center justify-center gap-0.5 text-sm transition-all"
             style={{ padding: "11px 8px", borderRadius: 7, border: `1.5px solid ${T.border}`, background: T.canvas, color: T.navy, fontWeight: 700 }}>
-            <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={2} />Llamar</span>
+            <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={2} />{t("contact.call")}</span>
             {phoneDisplay ? <span style={{ fontSize: "0.65rem", color: T.muted, fontWeight: 400 }}>{phoneDisplay}</span> : null}
           </a>
         ) : (
           <span className="flex flex-col items-center justify-center gap-0.5 text-sm"
             style={{ padding: "11px 8px", borderRadius: 7, border: `1.5px dashed ${T.border}`, background: T.canvas, color: T.muted, cursor: "default" }}
             title="Configura un teléfono en el admin">
-            <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={2} />Llamar</span>
+            <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" strokeWidth={2} />{t("contact.call")}</span>
           </span>
         )}
         <a href={whatsappContactHref} target="_blank" rel="noopener noreferrer"
@@ -1060,14 +1074,14 @@ function DevContactSection({
         </a>
       </div>
 
-      {showGlobalWhatsappHint ? <p style={{ fontSize: "0.65rem", color: T.muted }}>WhatsApp: enlace global del sitio.</p> : null}
+      {showGlobalWhatsappHint ? <p style={{ fontSize: "0.65rem", color: T.muted }}>{t("detail.whatsappGlobal")}</p> : null}
 
       {/* Divider */}
       <div className="relative py-1">
         <GoldRule />
         <div className="absolute inset-0 flex items-center justify-center">
           <span style={{ background: T.white, padding: "0 10px", fontSize: "0.6rem", letterSpacing: "0.14em", textTransform: "uppercase", color: T.muted }}>
-            O completa el formulario
+            {t("detail.orFillForm")}
           </span>
         </div>
       </div>
@@ -1079,21 +1093,21 @@ function DevContactSection({
       )}
       {submitted && (
         <div className="px-3 py-2.5 text-center text-xs" style={{ borderRadius: 6, border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.06)", color: "#15803d" }}>
-          ¡Mensaje enviado!
+          {t("detail.messageSent")}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-2.5">
         <div className="grid gap-2.5 sm:grid-cols-2">
-          <input type="text"  name="name"  required value={formData.name}  onChange={handleChange} className="dd-input" placeholder="Nombre"     autoComplete="name" />
-          <input type="tel"   name="phone" required value={formData.phone} onChange={handleChange} className="dd-input" placeholder="Tu teléfono" autoComplete="tel" />
+          <input type="text"  name="name"  required value={formData.name}  onChange={handleChange} className="dd-input" placeholder={t("form.name")}     autoComplete="name" />
+          <input type="tel"   name="phone" required value={formData.phone} onChange={handleChange} className="dd-input" placeholder={t("form.phone")} autoComplete="tel" />
         </div>
-        <input type="email" name="email" required value={formData.email} onChange={handleChange} className="dd-input" placeholder="Correo" autoComplete="email" />
-        <textarea name="message" value={formData.message} onChange={handleChange} rows={3} className="dd-input" style={{ resize: "none" }} placeholder="Mensaje (opcional)" />
+        <input type="email" name="email" required value={formData.email} onChange={handleChange} className="dd-input" placeholder={t("form.email")} autoComplete="email" />
+        <textarea name="message" value={formData.message} onChange={handleChange} rows={3} className="dd-input" style={{ resize: "none" }} placeholder={t("form.messageOptional")} />
         <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 transition-all"
           style={{ padding: "12px 20px", borderRadius: 7, background: submitting ? T.muted : T.navy, color: "#fff", fontWeight: 700, fontSize: "0.8rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, boxShadow: submitting ? "none" : "0 3px 14px rgba(20,28,46,0.22)" }}>
           <Send className="h-3.5 w-3.5" strokeWidth={2} />
-          {submitting ? "Enviando…" : "Enviar consulta"}
+          {submitting ? t("form.sending") : t("detail.sendInquiry")}
         </button>
       </form>
     </div>

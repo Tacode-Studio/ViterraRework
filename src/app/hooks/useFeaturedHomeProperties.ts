@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Property } from "../components/PropertyCard";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import {
@@ -7,17 +8,29 @@ import {
   type PropertyRow,
 } from "../lib/supabaseProperties";
 import { withTimeout } from "../lib/withTimeout";
+import { useLocale } from "../i18n/LocaleContext";
+import type { Locale } from "../i18n/locale";
+import {
+  DETAIL_FIELDS,
+  applyPropertyTranslations,
+  fetchCatalogTranslations,
+} from "../lib/catalogTranslations";
 
-const CACHE_KEY = "viterra_home_featured_v1";
+/**
+ * El caché guarda las fichas ya traducidas, así que la clave incluye el idioma:
+ * con una sola clave, cambiar a inglés mostraría el español recién guardado
+ * hasta que la red respondiera.
+ */
+const cacheKey = (locale: Locale) => `viterra_home_featured_v1_${locale}`;
 
 /** Objetivo de UX en portada: primera respuesta útil en &lt;1s cuando la red/colabora. */
 const FEATURED_FAST_MS = 950;
 const FEATURED_RELAXED_MS = 18_000;
 
-function readCache(): Property[] | null {
+function readCache(locale: Locale): Property[] | null {
   if (typeof sessionStorage === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
+    const raw = sessionStorage.getItem(cacheKey(locale));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { items?: Property[] };
     if (!Array.isArray(parsed.items) || parsed.items.length === 0) return null;
@@ -27,9 +40,9 @@ function readCache(): Property[] | null {
   }
 }
 
-function writeCache(items: Property[]) {
+function writeCache(locale: Locale, items: Property[]) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), items }));
+    sessionStorage.setItem(cacheKey(locale), JSON.stringify({ savedAt: Date.now(), items }));
   } catch {
     /* quota / modo privado */
   }
@@ -40,26 +53,42 @@ function writeCache(items: Property[]) {
  * sin descargar el catálogo entero.
  */
 export function useFeaturedHomeProperties() {
-  const initialCache = useRef(readCache());
+  const { locale } = useLocale();
+  const initialCache = useRef(readCache(locale));
   const genRef = useRef(0);
 
   const [properties, setProperties] = useState<Property[]>(() => initialCache.current ?? []);
   const [loading, setLoading] = useState(() => (initialCache.current?.length ?? 0) === 0);
   const [error, setError] = useState<string | null>(null);
 
-  const applyRows = useCallback((rows: PropertyRow[]) => {
-    const list = rows.map((row) => rowToProperty(row));
-    setProperties(list);
-    if (list.length > 0) writeCache(list);
-    else {
-      try {
-        sessionStorage.removeItem(CACHE_KEY);
-      } catch {
-        /* noop */
+  const applyRows = useCallback(
+    async (client: SupabaseClient, rows: PropertyRow[]) => {
+      const mapped = rows.map((row) => rowToProperty(row));
+      /**
+       * Mismo criterio que el catálogo: se traduce aquí para que la portada
+       * reciba el texto en el idioma activo. Si la consulta falla, el mapa
+       * viene vacío y queda el español, que es el respaldo correcto.
+       */
+      const translations = await fetchCatalogTranslations(client, {
+        entity: "property",
+        ids: mapped.map((p) => p.id),
+        fields: DETAIL_FIELDS,
+        locale,
+      });
+      const list = mapped.map((p) => applyPropertyTranslations(p, translations));
+      setProperties(list);
+      if (list.length > 0) writeCache(locale, list);
+      else {
+        try {
+          sessionStorage.removeItem(cacheKey(locale));
+        } catch {
+          /* noop */
+        }
       }
-    }
-    setError(null);
-  }, []);
+      setError(null);
+    },
+    [locale],
+  );
 
   const reload = useCallback(async () => {
     const gen = ++genRef.current;
@@ -94,12 +123,13 @@ export function useFeaturedHomeProperties() {
     if (gen !== genRef.current) return;
 
     if (last && !last.error && Array.isArray(last.data)) {
-      applyRows(last.data as PropertyRow[]);
+      await applyRows(client, last.data as PropertyRow[]);
+      if (gen !== genRef.current) return;
       setLoading(false);
       return;
     }
 
-    const cached = readCache();
+    const cached = readCache(locale);
     if (cached?.length) {
       setProperties(cached);
       setError(null);
@@ -108,7 +138,7 @@ export function useFeaturedHomeProperties() {
       setError(last?.error?.message ?? "No se pudieron cargar las propiedades destacadas.");
     }
     setLoading(false);
-  }, [applyRows]);
+  }, [applyRows, locale]);
 
   useEffect(() => {
     const gen = ++genRef.current;
@@ -135,7 +165,7 @@ export function useFeaturedHomeProperties() {
         try {
           last = await fn();
           if (last && !last.error) {
-            applyRows((last.data ?? []) as PropertyRow[]);
+            await applyRows(client, (last.data ?? []) as PropertyRow[]);
             if (gen !== genRef.current) return;
             setLoading(false);
             return;
@@ -147,7 +177,7 @@ export function useFeaturedHomeProperties() {
 
       if (gen !== genRef.current) return;
 
-      const cached = readCache();
+      const cached = readCache(locale);
       if (cached?.length) {
         setProperties(cached);
         setError(null);

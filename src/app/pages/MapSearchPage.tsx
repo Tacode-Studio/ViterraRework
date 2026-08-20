@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import type { CircleMarker, Layer, Map as LeafletMap, Marker } from "leaflet";
 import L from "leaflet";
 import { cn } from "../components/ui/utils";
@@ -12,6 +13,7 @@ import {
   propertyPriceForOperation,
   propertyStatusLabel,
 } from "../components/PropertyCard";
+import { useLocale } from "../i18n/LocaleContext";
 import { useCatalogProperties } from "../hooks/useCatalogProperties";
 import { useTokkoPropertyTypes } from "../hooks/useTokkoPropertyTypes";
 import { propertyMatchesTypeFilter } from "../lib/propertyTypesCatalog";
@@ -227,6 +229,7 @@ function statusFromSearchParams(searchParams: URLSearchParams): "" | "venta" | "
 }
 
 export function MapSearchPage() {
+  const { locale, t } = useLocale();
   const { properties: catalogProperties } = useCatalogProperties();
   const catalogPropertyTypes = useMemo(
     () => catalogProperties.map((p) => p.type).filter(Boolean),
@@ -520,8 +523,8 @@ export function MapSearchPage() {
       satelliteLayer.addTo(map);
       L.control.layers(
         {
-          Mapa: streetLayer,
-          "Satélite": satelliteLayer,
+          [t("map.street")]: streetLayer,
+          [t("map.satellite")]: satelliteLayer,
         },
         undefined,
         { position: "bottomleft" }
@@ -868,7 +871,7 @@ export function MapSearchPage() {
           </label>
           <input
             type="number"
-            placeholder="Sin límite"
+            placeholder={t("map.noLimit")}
             value={filters.maxPrice}
             onChange={(e) => setFilters((s) => ({ ...s, maxPrice: e.target.value }))}
             className="w-full rounded-none border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-sm tabular-nums text-slate-900 placeholder:text-slate-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25"
@@ -900,7 +903,7 @@ export function MapSearchPage() {
                   {results.length} {results.length === 1 ? "alojamiento" : "alojamientos"}
                 </p>
                 <p className="mt-0.5 text-[13px] font-medium text-brand-navy/65">
-                  {zone ? "Solo en el área marcada en el mapa" : "Guadalajara y zona metropolitana"}
+                  {zone ? t("map.onlyMarkedArea") : "Guadalajara y zona metropolitana"}
                   {nearbyRadiusKm != null && zone?.kind === "circle" && (
                     <span className="ml-2 inline-block border border-brand-navy/20 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-navy">
                       Radio: {nearbyRadiusKm} km
@@ -966,7 +969,7 @@ export function MapSearchPage() {
               <details className="group overflow-hidden rounded-none border-2 border-brand-navy/25 bg-white shadow-[0_4px_20px_-4px_rgba(20,28,46,0.18)] open:shadow-[0_8px_28px_-6px_rgba(20,28,46,0.22)]">
                 <summary className="flex cursor-pointer list-none items-center justify-between bg-brand-navy px-4 py-3.5 marker:content-none [&::-webkit-details-marker]:hidden sm:py-4">
                   <span className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-white">
-                    Filtros
+                    {t("map.filters")}
                   </span>
                   <ChevronDown
                     className="h-5 w-5 shrink-0 text-white/90 transition-transform duration-200 group-open:rotate-180"
@@ -1035,7 +1038,7 @@ export function MapSearchPage() {
                       onClick={() => setMobileFiltersOpen((v) => !v)}
                       className="font-heading inline-flex flex-1 items-center justify-center rounded-none border-2 border-slate-200 bg-white px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-navy shadow-sm transition-colors hover:border-brand-navy hover:text-primary"
                     >
-                      {mobileFiltersOpen ? "Cerrar filtros" : "Filtros"}
+                      {mobileFiltersOpen ? t("map.closeFilters") : t("map.filters")}
                     </button>
                     <button
                       type="button"
@@ -1113,7 +1116,7 @@ export function MapSearchPage() {
                   <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-brand-navy/15 border-t-primary" />
                   <MapPin className="absolute inset-0 m-auto h-5 w-5 text-primary" strokeWidth={2} />
                 </div>
-                <p className="font-heading text-sm font-medium text-brand-navy/60">Cargando mapa…</p>
+                <p className="font-heading text-sm font-medium text-brand-navy/60">{t("map.loading")}</p>
               </div>
             )}
 
@@ -1167,7 +1170,7 @@ export function MapSearchPage() {
                     </button>
                     <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-2.5rem)] flex-wrap gap-1">
                       <span className="bg-primary px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-white">
-                        {propertyStatusLabel(selectedProperty.status)}
+                        {propertyStatusLabel(selectedProperty.status, locale)}
                       </span>
                       <span className="border border-white/60 bg-white px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] text-brand-navy">
                         {selectedProperty.type}
@@ -1202,7 +1205,7 @@ export function MapSearchPage() {
                     <div className="mt-2.5 space-y-1.5 border border-slate-200 px-2.5 py-2">
                       {selectedProperty.status === "venta_y_alquiler" && (
                         <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                          Se puede comprar o rentar
+                          {t("card.dualOperation")}
                         </p>
                       )}
                       {(selectedProperty.status === "venta" ||

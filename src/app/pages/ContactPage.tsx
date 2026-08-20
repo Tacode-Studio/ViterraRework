@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Link } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import { Header } from "../components/Header";
 import { Footer, VITERRA_GOOGLE_MAPS_URL } from "../components/Footer";
 import {
@@ -21,6 +21,7 @@ import {
 import { usePreviewCanvas, usePreviewLayout } from "../../contexts/PreviewCanvasContext";
 import { useSiteContent } from "../../contexts/SiteContentContext";
 import { PreviewFieldPulse } from "../components/admin/siteEditor/PreviewFieldPulse";
+import { useLocale } from "../i18n/LocaleContext";
 import { PreviewSectionChrome } from "../components/admin/siteEditor/PreviewSectionChrome";
 import { HeroBackdropMedia } from "../components/HeroBackdropMedia";
 import { Reveal } from "../components/Reveal";
@@ -175,6 +176,7 @@ function ClosingLink({
 }
 
 export function ContactPage() {
+  const { t } = useLocale();
   const reduceMotion = useReducedMotion();
   const pl = usePreviewLayout();
   const { content } = useSiteContent();
@@ -725,7 +727,7 @@ export function ContactPage() {
                   <div className={cn("grid gap-8", pl.gridCols("grid-cols-1 md:grid-cols-2"))}>
                     <div>
                       <label htmlFor="name" className="mb-2 block text-[10px] font-medium uppercase tracking-[0.18em] text-brand-navy/55">
-                        Nombre completo *
+                        {t("form.fullName")} *
                       </label>
                       <input
                         type="text"
@@ -735,12 +737,12 @@ export function ContactPage() {
                         value={formData.name}
                         onChange={handleChange}
                         className={inputUnderline}
-                        placeholder="Tu nombre"
+                        placeholder={t("form.namePlaceholder")}
                       />
                     </div>
                     <div>
                       <label htmlFor="email" className="mb-2 block text-[10px] font-medium uppercase tracking-[0.18em] text-brand-navy/55">
-                        Email *
+                        {t("form.email")} *
                       </label>
                       <input
                         type="email"
@@ -758,7 +760,7 @@ export function ContactPage() {
                   <div className={cn("grid gap-8", pl.gridCols("grid-cols-1 md:grid-cols-2"))}>
                     <div>
                       <label htmlFor="phone" className="mb-2 block text-[10px] font-medium uppercase tracking-[0.18em] text-brand-navy/55">
-                        Teléfono *
+                        {t("form.phoneLabel")} *
                       </label>
                       <input
                         type="tel"
@@ -773,7 +775,7 @@ export function ContactPage() {
                     </div>
                     <div>
                       <label htmlFor="subject" className="mb-2 block text-[10px] font-medium uppercase tracking-[0.18em] text-brand-navy/55">
-                        Asunto *
+                        {t("form.subject")} *
                       </label>
                       <div className="relative">
                         <select
@@ -787,12 +789,12 @@ export function ContactPage() {
                             "cursor-pointer appearance-none pr-10 text-brand-navy"
                           )}
                         >
-                          <option value="">Selecciona un asunto</option>
-                          <option value="compra">Compra de propiedad</option>
-                          <option value="venta">Venta de propiedad</option>
-                          <option value="alquiler">Renta</option>
-                          <option value="asesoria">Asesoría</option>
-                          <option value="otro">Otro</option>
+                          <option value="">{t("form.subjectPlaceholder")}</option>
+                          <option value="compra">{t("form.subjectBuy")}</option>
+                          <option value="venta">{t("form.subjectSell")}</option>
+                          <option value="alquiler">{t("form.subjectRent")}</option>
+                          <option value="asesoria">{t("form.subjectAdvice")}</option>
+                          <option value="otro">{t("form.subjectOther")}</option>
                         </select>
                         <span className="pointer-events-none absolute inset-y-0 right-0 flex w-9 items-center justify-center text-brand-navy/45">
                           <ChevronDown className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -803,7 +805,7 @@ export function ContactPage() {
 
                   <div>
                     <label htmlFor="message" className="mb-2 block text-[10px] font-medium uppercase tracking-[0.18em] text-brand-navy/55">
-                      Mensaje *
+                      {t("form.messageLabel")} *
                     </label>
                     <textarea
                       id="message"
@@ -813,7 +815,7 @@ export function ContactPage() {
                       onChange={handleChange}
                       rows={5}
                       className={cn(inputUnderline, "resize-none")}
-                      placeholder="Cuéntanos cómo podemos ayudarte..."
+                      placeholder={t("form.messagePlaceholder")}
                     />
                   </div>
 
@@ -833,11 +835,11 @@ export function ContactPage() {
                       className="group inline-flex items-center justify-center gap-2 border border-brand-navy px-10 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-navy transition-colors hover:bg-brand-navy hover:text-white"
                     >
                       <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
-                      Enviar mensaje
+                      {t("form.sendMessage")}
                     </motion.button>
                   </div>
 
-                  <p className="text-center text-xs text-brand-navy/50">* Campos obligatorios</p>
+                  <p className="text-center text-xs text-brand-navy/50">{t("form.requiredFields")}</p>
                 </form>
               </div>
             </Reveal>
@@ -963,7 +965,7 @@ export function ContactPage() {
             </Reveal>
 
             <Reveal y={16} delay={0.12} className="mt-12">
-              <p className="text-center text-[11px] font-light uppercase tracking-[0.18em] text-white/55">{contactFixed.advisorCta}</p>
+              <p className="text-center text-[11px] font-light uppercase tracking-[0.18em] text-white/55">{t("contact.advisorCta")}</p>
             </Reveal>
 
           </div>

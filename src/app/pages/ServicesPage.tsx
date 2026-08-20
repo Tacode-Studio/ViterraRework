@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { Link } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import { ArrowRight } from "lucide-react";
 import { useSiteContent } from "../../contexts/SiteContentContext";
 import { usePreviewLayout } from "../../contexts/PreviewCanvasContext";

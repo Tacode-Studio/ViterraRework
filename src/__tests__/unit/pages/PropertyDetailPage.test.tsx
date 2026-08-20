@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route } from "react-router";
 import React from "react";
 import { PropertyDetailPage } from "../../../app/pages/PropertyDetailPage";
 import { SiteContentProvider } from "../../../contexts/SiteContentContext";
+import { LocaleProvider } from "../../../app/i18n/LocaleContext";
 import * as supabaseClientModule from "../../../app/lib/supabaseClient";
 import * as useCatalogPropertiesModule from "../../../app/hooks/useCatalogProperties";
 
@@ -41,11 +42,13 @@ describe("PropertyDetailPage Component", () => {
   const renderWithRoute = (id: string) =>
     render(
       <MemoryRouter initialEntries={[`/propiedad/${id}`]}>
+        <LocaleProvider>
         <SiteContentProvider>
           <Routes>
             <Route path="/propiedad/:id" element={<PropertyDetailPage />} />
           </Routes>
         </SiteContentProvider>
+      </LocaleProvider>
       </MemoryRouter>
     );
 

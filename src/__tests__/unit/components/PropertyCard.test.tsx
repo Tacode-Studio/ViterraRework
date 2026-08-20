@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { MemoryRouter } from "react-router";
+import { LocaleProvider } from "../../../app/i18n/LocaleContext";
 import React from "react";
 import {
   PropertyCard,
@@ -44,7 +45,9 @@ describe("PropertyCard & helper functions", () => {
     it("should render property details (title, price, bedrooms, status badge)", () => {
       render(
         <MemoryRouter>
-          <PropertyCard property={mockProperty} />
+          <LocaleProvider>
+            <PropertyCard property={mockProperty} />
+          </LocaleProvider>
         </MemoryRouter>
       );
 

@@ -25,6 +25,7 @@ import {
 } from "./siteEditor/sitePreviewFrameMessages";
 import { cn } from "../ui/utils";
 import { mergeSiteSection } from "../../../lib/siteContentMerge";
+import { LOCALES } from "../../i18n/locale";
 
 const SITE_LABELS: Record<SiteKey, string> = {
   home: "Inicio",
@@ -71,7 +72,16 @@ function cloneSection<K extends SiteKey>(key: K, data: SiteContent): SiteContent
 }
 
 export function AdminSiteEditor() {
-  const { content, setSection, resetToDefaults, loading, error: siteError, syncState } = useSiteContent();
+  const {
+    content,
+    setSection,
+    resetToDefaults,
+    loading,
+    error: siteError,
+    syncState,
+    locale: editingLocale,
+    setLocale,
+  } = useSiteContent();
   const [tab, setTab] = useState<SiteKey>("home");
   const tabRef = useRef(tab);
   tabRef.current = tab;
@@ -450,6 +460,54 @@ export function AdminSiteEditor() {
     </>
   );
 
+  /**
+   * Selector del idioma que se está editando. Cambiarlo recarga `content` desde
+   * el servidor, lo que a su vez reinicia el borrador por el efecto de arriba,
+   * así que se confirma antes de descartar cambios sin guardar.
+   */
+  const localeControls = (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/90 px-2 py-1.5">
+      <span
+        className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs"
+        title="Idioma que estás editando. El contenido en inglés se escribe a mano: elige EN y edita la página."
+      >
+        Idioma
+      </span>
+      <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
+        {LOCALES.map((l) => {
+          const active = l === editingLocale;
+          return (
+            <button
+              key={l}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                if (l === editingLocale) return;
+                if (
+                  isDirty &&
+                  !window.confirm(
+                    "Hay cambios sin guardar en esta página. Si cambias de idioma se descartarán. ¿Continuar?",
+                  )
+                ) {
+                  return;
+                }
+                setLocale(l);
+              }}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors sm:text-xs",
+                active
+                  ? "bg-brand-navy text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-100",
+              )}
+            >
+              {l}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const persistControls = (
     <div className="space-y-1">
       <div className="min-h-[1.125rem] text-[10px] leading-tight text-slate-600 sm:text-xs" aria-live="polite">
@@ -647,6 +705,7 @@ export function AdminSiteEditor() {
               mobileSplitTab !== "edit" && "hidden lg:flex",
             )}
           >
+            <div className="shrink-0">{localeControls}</div>
             <div
               className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-lg border border-slate-200 bg-white p-2.5 shadow-inner sm:p-3 [overscroll-behavior-y:contain]"
               onPointerDown={(e) => {

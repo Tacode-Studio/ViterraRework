@@ -1,37 +1,118 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<!-- Cada página se lista en ambos idiomas y ambas se declaran alternativas
+     entre sí (hreflang), que es lo que Google exige para no tratarlas como
+     contenido duplicado. El español es x-default. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://www.viterrainmobiliaria.com/</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/"/>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/"/>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://www.viterrainmobiliaria.com/renta</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/renta"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/renta"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/renta"/>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en/renta</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/renta"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/renta"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/renta"/>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.viterrainmobiliaria.com/venta</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/venta"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/venta"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/venta"/>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en/venta</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/venta"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/venta"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/venta"/>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.viterrainmobiliaria.com/desarrollos</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/desarrollos"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/desarrollos"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/desarrollos"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en/desarrollos</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/desarrollos"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/desarrollos"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/desarrollos"/>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.viterrainmobiliaria.com/servicios</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/servicios"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/servicios"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/servicios"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en/servicios</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/servicios"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/servicios"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/servicios"/>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.viterrainmobiliaria.com/nosotros</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/nosotros"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/nosotros"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/nosotros"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en/nosotros</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/nosotros"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/nosotros"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/nosotros"/>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>https://www.viterrainmobiliaria.com/contacto</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/contacto"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/contacto"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/contacto"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.viterrainmobiliaria.com/en/contacto</loc>
+    <xhtml:link rel="alternate" hreflang="es-MX" href="https://www.viterrainmobiliaria.com/contacto"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.viterrainmobiliaria.com/en/contacto"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.viterrainmobiliaria.com/contacto"/>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

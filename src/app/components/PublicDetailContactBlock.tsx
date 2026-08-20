@@ -2,6 +2,7 @@ import { Phone } from "lucide-react";
 import { formatPhoneForDisplay } from "../lib/phoneLink";
 import { whatsappDisplayLabel } from "../lib/whatsappLink";
 import { WhatsAppGlyph } from "./WhatsAppGlyph";
+import { useLocale } from "../i18n/LocaleContext";
 
 type Props = {
   title: string;
@@ -11,6 +12,7 @@ type Props = {
   telHref: string | null;
   whatsappHref: string;
   responsibleName?: string;
+  /** Por defecto usa la traducción de "Llamar". */
   callButtonLabel?: string;
   showGlobalWhatsappHint?: boolean;
   phoneInvalidHint?: string;
@@ -26,11 +28,13 @@ export function PublicDetailContactBlock({
   telHref,
   whatsappHref,
   responsibleName,
-  callButtonLabel = "Llamar",
+  callButtonLabel,
   showGlobalWhatsappHint = false,
   phoneInvalidHint,
   embedded = false,
 }: Props) {
+  const { t } = useLocale();
+  const callLabel = callButtonLabel ?? t("contact.call");
   const phoneRaw = phone?.trim() ?? "";
   const phoneDisplay = formatPhoneForDisplay(phoneRaw);
   const waDisplay = whatsappDisplayLabel(whatsappStored);
@@ -49,13 +53,13 @@ export function PublicDetailContactBlock({
         <div className="mt-4 space-y-2 rounded-lg border border-slate-200/90 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           {responsibleName?.trim() ? (
             <p>
-              <span className="font-medium text-slate-800">Responsable:</span> {responsibleName.trim()}
+              <span className="font-medium text-slate-800">{t("contact.responsible")}:</span> {responsibleName.trim()}
             </p>
           ) : null}
           {phoneDisplay ? (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Phone className="h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.75} />
-              <span className="font-medium text-slate-800">Teléfono:</span>
+              <span className="font-medium text-slate-800">{t("contact.phone")}:</span>
               {telHref ? (
                 <a href={telHref} className="font-semibold text-slate-900 hover:text-primary hover:underline">
                   {phoneDisplay}
@@ -91,7 +95,7 @@ export function PublicDetailContactBlock({
           >
             <span className="flex items-center gap-2">
               <Phone className="h-4 w-4" strokeWidth={2} />
-              {callButtonLabel}
+              {callLabel}
             </span>
             {phoneDisplay ? (
               <span className="text-[11px] font-medium text-slate-600">{phoneDisplay}</span>
@@ -107,7 +111,7 @@ export function PublicDetailContactBlock({
           >
             <span className="flex items-center gap-2">
               <Phone className="h-4 w-4" strokeWidth={2} />
-              {callButtonLabel}
+              {callLabel}
             </span>
             {phoneDisplay ? (
               <span className="text-[11px] text-slate-500">{phoneDisplay}</span>

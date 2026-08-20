@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SiteContent } from "../../data/siteContent";
 import { mergeSiteSection } from "../../lib/siteContentMerge";
+import { deepMerge } from "../../lib/deepMerge";
+import { DEFAULT_LOCALE, type Locale } from "../i18n/locale";
 
 export const SITE_CONTENT_PAGE_KEYS: (keyof SiteContent)[] = [
   "home",
@@ -19,44 +21,109 @@ export type SiteContentPageKey = keyof SiteContent;
 /** Bucket público del CMS (imágenes / vídeos del sitio). */
 export const SITE_STORAGE_BUCKET_ID = "site" as const;
 
-type SectionRow = { page: string; payload: unknown };
+type SectionRow = { page: string; locale?: string | null; payload: unknown };
 
-/** Lee todas las secciones y las fusiona con los valores por defecto. */
-export async function fetchAllSiteSections(client: SupabaseClient): Promise<SiteContent> {
-  const { data, error } = await client.from("site_content_sections").select("page,payload");
-  if (error) throw error;
-  const rows = (data ?? []) as SectionRow[];
-  const byPage: Partial<Record<SiteContentPageKey, unknown>> = {};
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * Payload efectivo de una página: lo traducido encima de lo que hay en el
+ * idioma por defecto. Así una sección traducida a medias muestra en inglés los
+ * campos ya traducidos y en español los que faltan, en vez de quedar vacía.
+ *
+ * Los arrays del patch sustituyen al base (regla de `deepMerge`), de modo que
+ * una lista —tarjetas de servicios, FAQ— se traduce entera o no se traduce.
+ */
+export function resolveLocalizedPayload(
+  base: unknown,
+  override: unknown,
+): unknown {
+  if (!isPlainObject(override)) return base;
+  if (!isPlainObject(base)) return override;
+  return deepMerge(base, override);
+}
+
+/** `undefined_column` de Postgres: la columna pedida no existe. */
+const PG_UNDEFINED_COLUMN = "42703";
+
+/**
+ * Lee las filas de secciones.
+ *
+ * El despliegue del bundle y la aplicación de migraciones no son atómicos: en
+ * Vercel el código sale con el push y `supabase db push` se corre aparte. Si el
+ * código llegara primero, pedir `locale` daría 400 y el sitio entero caería a
+ * los valores por defecto del bundle. Por eso, si la columna todavía no existe,
+ * se reintenta con el esquema anterior y todo cuenta como idioma por defecto.
+ *
+ * Este respaldo se puede borrar una vez aplicada la migración en todos los
+ * entornos.
+ */
+async function fetchSectionRows(client: SupabaseClient): Promise<SectionRow[]> {
+  const { data, error } = await client
+    .from("site_content_sections")
+    .select("page,locale,payload");
+
+  if (!error) return (data ?? []) as SectionRow[];
+  if (error.code !== PG_UNDEFINED_COLUMN) throw error;
+
+  const legacy = await client.from("site_content_sections").select("page,payload");
+  if (legacy.error) throw legacy.error;
+  return (legacy.data ?? []) as SectionRow[];
+}
+
+/**
+ * Lee las secciones del idioma pedido, con respaldo al idioma por defecto, y
+ * las fusiona con los valores del bundle.
+ */
+export async function fetchAllSiteSections(
+  client: SupabaseClient,
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<SiteContent> {
+  const rows = await fetchSectionRows(client);
+  const base: Partial<Record<SiteContentPageKey, unknown>> = {};
+  const override: Partial<Record<SiteContentPageKey, unknown>> = {};
+
   for (const r of rows) {
-    const p = r.page as keyof SiteContent;
-    if (SITE_CONTENT_PAGE_KEYS.includes(p)) byPage[p as SiteContentPageKey] = r.payload;
+    const p = r.page as SiteContentPageKey;
+    if (!SITE_CONTENT_PAGE_KEYS.includes(p)) continue;
+    // Filas anteriores a la columna `locale` cuentan como idioma por defecto.
+    const rowLocale = (r.locale?.trim() || DEFAULT_LOCALE) as Locale;
+    if (rowLocale === DEFAULT_LOCALE) base[p] = r.payload;
+    else if (rowLocale === locale) override[p] = r.payload;
   }
+
+  const payloadFor = (p: SiteContentPageKey) =>
+    locale === DEFAULT_LOCALE ? base[p] : resolveLocalizedPayload(base[p], override[p]);
+
   return {
-    home: mergeSiteSection("home", byPage.home),
-    header: mergeSiteSection("header", byPage.header),
-    footer: mergeSiteSection("footer", byPage.footer),
-    contact: mergeSiteSection("contact", byPage.contact),
-    services: mergeSiteSection("services", byPage.services),
-    about: mergeSiteSection("about", byPage.about),
-    developments: mergeSiteSection("developments", byPage.developments),
-    rent: mergeSiteSection("rent", byPage.rent),
-    sale: mergeSiteSection("sale", byPage.sale),
+    home: mergeSiteSection("home", payloadFor("home")),
+    header: mergeSiteSection("header", payloadFor("header")),
+    footer: mergeSiteSection("footer", payloadFor("footer")),
+    contact: mergeSiteSection("contact", payloadFor("contact")),
+    services: mergeSiteSection("services", payloadFor("services")),
+    about: mergeSiteSection("about", payloadFor("about")),
+    developments: mergeSiteSection("developments", payloadFor("developments")),
+    rent: mergeSiteSection("rent", payloadFor("rent")),
+    sale: mergeSiteSection("sale", payloadFor("sale")),
   };
 }
 
-/** Persiste una sección completa (JSON ya fusionado en cliente). */
+/** Persiste una sección completa (JSON ya fusionado en cliente) para un idioma. */
 export async function upsertSiteSection<K extends keyof SiteContent>(
   client: SupabaseClient,
   page: K,
-  section: SiteContent[K]
+  section: SiteContent[K],
+  locale: Locale = DEFAULT_LOCALE,
 ) {
   return client.from("site_content_sections").upsert(
     {
       page,
+      locale,
       payload: section as unknown as Record<string, unknown>,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "page" }
+    { onConflict: "page,locale" }
   );
 }
 
@@ -139,10 +206,11 @@ export async function removeSiteStorageObjectByPublicUrl(client: SupabaseClient,
 /** Persiste todas las secciones del sitio con los valores por defecto fusionados (reset). */
 export async function upsertAllDefaultSections(
   client: SupabaseClient,
-  defaults: SiteContent
+  defaults: SiteContent,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<{ error: Error | null }> {
   for (const page of SITE_CONTENT_PAGE_KEYS) {
-    const { error } = await upsertSiteSection(client, page, defaults[page]);
+    const { error } = await upsertSiteSection(client, page, defaults[page], locale);
     if (error) return { error: new Error(error.message) };
   }
   return { error: null };

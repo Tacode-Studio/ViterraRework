@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useSyncExternalStore, type CSSProperties }
 import { ChevronDown } from "lucide-react";
 import { VITERRA_NAV_ITEMS, isActiveNavPath } from "../config/siteNav";
 import { SocialNavIcons } from "./SocialNavIcons";
+import { LanguageToggle } from "./LanguageToggle";
+import { useLocale } from "../i18n/LocaleContext";
 import { cn } from "./ui/utils";
 
 const NAVY = { r: 20, g: 28, b: 46 } as const;
@@ -67,6 +69,7 @@ function lineRevealStyle(
 
 export function MapSearchHeaderBar() {
   const location = useLocation();
+  const { t, localePath } = useLocale();
   const [open, setOpen] = useState(false);
   /** Sigue en DOM unos ms al cerrar para que el fondo termine scaleY(0). */
   const [panelMounted, setPanelMounted] = useState(false);
@@ -201,12 +204,12 @@ export function MapSearchHeaderBar() {
               Grupo Inmobiliario
             </p>
             <nav className="flex flex-col gap-0.5">
-              {VITERRA_NAV_ITEMS.map(([to, label], i) => {
+              {VITERRA_NAV_ITEMS.map(([to, labelKey], i) => {
                 const active = isActiveNavPath(location.pathname, to);
                 return (
                   <Link
                     key={to}
-                    to={to}
+                    to={localePath(to)}
                     onClick={close}
                     className={cn(
                       "rounded-lg border-l-[3px] px-3 py-2.5 text-xs uppercase tracking-[0.12em] sm:text-sm",
@@ -217,11 +220,14 @@ export function MapSearchHeaderBar() {
                     style={lineRevealStyle(1 + i, open, reducedMotion)}
                     aria-current={active ? "page" : undefined}
                   >
-                    {label}
+                    {t(labelKey)}
                   </Link>
                 );
               })}
             </nav>
+            <div className="mt-3 flex justify-center border-t border-white/10 pt-3">
+              <LanguageToggle />
+            </div>
           </div>
         </div>
       </div>

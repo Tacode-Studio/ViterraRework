@@ -179,6 +179,30 @@ export function HomeEditorForm({
       </EditorSection>
       )}
 
+      {s("home-social") && (
+      <EditorSection title="Síguenos (Instagram)" sectionId="home-social">
+        <LabeledField label="Etiqueta" editorFieldKey="home-social-kicker">
+          <TextInput value={draft.socialKicker} onChange={(v) => p({ socialKicker: v })} />
+        </LabeledField>
+        <LabeledField label="Título" editorFieldKey="home-social-title">
+          <TextInput value={draft.socialTitle} onChange={(v) => p({ socialTitle: v })} />
+        </LabeledField>
+        <LabeledField label="Descripción" editorFieldKey="home-social-subtitle">
+          <TextArea value={draft.socialSubtitle} onChange={(v) => p({ socialSubtitle: v })} rows={2} />
+        </LabeledField>
+        <LabeledField label="Texto del botón" editorFieldKey="home-social-cta">
+          <TextInput value={draft.socialCta} onChange={(v) => p({ socialCta: v })} />
+        </LabeledField>
+        <LabeledField label="Aviso si el feed no carga" editorFieldKey="home-social-empty">
+          <TextArea value={draft.socialEmpty} onChange={(v) => p({ socialEmpty: v })} rows={2} />
+        </LabeledField>
+        <p className="text-xs text-slate-500">
+          Las publicaciones se traen de Instagram automáticamente y el enlace al perfil sale de «Mi
+          empresa»: aquí solo se edita el texto de la sección.
+        </p>
+      </EditorSection>
+      )}
+
       {s("home-experience") && (
       <EditorSection title="Bloque Experiencia" sectionId="home-experience">
         <ImageUploadField
@@ -2329,6 +2353,30 @@ export function DevelopmentsEditorForm({
         <LabeledField label="Título" editorFieldKey="dev-featured-title">
           <TextInput value={draft.featuredTitle} onChange={(v) => p({ featuredTitle: v })} />
         </LabeledField>
+      </EditorSection>
+      )}
+
+      {s("dev-cta") && (
+      <EditorSection title="Llamado a la acción" sectionId="dev-cta">
+        <LabeledField label="Título" editorFieldKey="dev-cta-title">
+          <TextInput value={draft.ctaTitle} onChange={(v) => p({ ctaTitle: v })} />
+        </LabeledField>
+        <LabeledField label="Descripción" editorFieldKey="dev-cta-subtitle">
+          <TextArea value={draft.ctaSubtitle} onChange={(v) => p({ ctaSubtitle: v })} rows={3} />
+        </LabeledField>
+        <LabeledField label="Botón principal" editorFieldKey="dev-cta-primary">
+          <TextInput value={draft.ctaPrimaryLabel} onChange={(v) => p({ ctaPrimaryLabel: v })} />
+        </LabeledField>
+        <LabeledField label="Botón secundario" editorFieldKey="dev-cta-secondary">
+          <TextInput value={draft.ctaSecondaryLabel} onChange={(v) => p({ ctaSecondaryLabel: v })} />
+        </LabeledField>
+        <LabeledField label="Teléfono del botón «Llamar ahora»" editorFieldKey="dev-cta-phone">
+          <TextInput value={draft.ctaPhone} onChange={(v) => p({ ctaPhone: v })} />
+        </LabeledField>
+        <p className="text-xs text-slate-500">
+          El botón principal siempre lleva a /contacto. El teléfono se usa tal cual en el enlace de
+          llamada: escríbelo con lada internacional, por ejemplo +523314457122.
+        </p>
       </EditorSection>
       )}
     </div>

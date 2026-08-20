@@ -3,6 +3,12 @@ import type { Property } from "../components/PropertyCard";
 import { getSupabaseClient, syncSupabaseAuthSession } from "../lib/supabaseClient";
 import { logTableCountHints } from "../lib/supabaseDiagnostics";
 import { fetchCatalogProperties, rowToProperty, type PropertyRow } from "../lib/supabaseProperties";
+import {
+  DETAIL_FIELDS,
+  applyPropertyTranslations,
+  fetchCatalogTranslations,
+} from "../lib/catalogTranslations";
+import { useLocale } from "../i18n/LocaleContext";
 import { withTimeout } from "../lib/withTimeout";
 
 const CATALOG_FETCH_ATTEMPTS = 3;
@@ -21,6 +27,7 @@ export type UseCatalogPropertiesOptions = {
 };
 
 export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
+  const { locale } = useLocale();
   const enabled = opts?.enabled !== false;
   const omitPayload = Boolean(opts?.omitPayload);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -120,7 +127,20 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
       } else {
         if (silent) setError(null);
         const list = rows ?? [];
-        setProperties(list.map((row) => rowToProperty(row)));
+        const mapped = list.map((row) => rowToProperty(row));
+        /**
+         * Las traducciones se aplican aquí para que toda vista que use este
+         * hook reciba el texto ya en el idioma activo. Si la consulta falla se
+         * devuelve un mapa vacío y queda el español, que es el respaldo.
+         */
+        const translations = await fetchCatalogTranslations(client, {
+          entity: "property",
+          ids: mapped.map((p) => p.id),
+          fields: DETAIL_FIELDS,
+          locale,
+        });
+        if (gen !== fetchGenerationRef.current) return;
+        setProperties(mapped.map((p) => applyPropertyTranslations(p, translations)));
         lastFetchedAtRef.current = Date.now();
         if (import.meta.env.DEV && list.length === 0) {
           void logTableCountHints(client, "properties");
@@ -131,7 +151,7 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
         setLoading(false);
       }
     }
-  }, [omitPayload]);
+  }, [omitPayload, locale]);
 
   useEffect(() => {
     if (!enabled) {

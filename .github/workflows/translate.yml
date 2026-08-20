@@ -1,0 +1,57 @@
+name: Traducción automática del catálogo ES→EN
+
+# Traduce SOLO el catálogo (propiedades y desarrollos), que es el texto que
+# entra por la importación de Tokko sin que nadie pueda traducirlo a mano. Los
+# textos del sitio se traducen desde el editor del admin, no aquí.
+#
+# GitHub Actions y no un cron de Vercel a propósito: el Batch API puede tardar
+# desde minutos hasta horas en resolver un lote, y las funciones serverless de
+# Vercel tienen tope de duración. Un job de Actions puede esperar sin cortarse.
+#
+# El script salta lo que ya está traducido comparando un SHA-256 del original,
+# así que una corrida sin fichas nuevas NO llama a la API y cuesta $0. Lo que se
+# paga depende del inventario nuevo que entre por Tokko, no de cada cuánto corre
+# esto: subir o bajar la frecuencia no cambia el gasto del mes, solo cuánto
+# tarda una ficha nueva en aparecer traducida en /en.
+on:
+  schedule:
+    # Lunes 07:00 UTC = 01:00 en Guadalajara (México no cambia horario desde
+    # 2022, así que la equivalencia no se mueve en todo el año).
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Solo reportar qué traduciría y cuánto costaría (no gasta créditos)"
+        type: boolean
+        default: true
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    # El lote puede tardar; sin esto el job moriría a las 6 horas por defecto.
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+
+      - name: Traducir fichas pendientes del catálogo
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Necesaria para escribir: RLS solo permite escritura a admin o service role.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        # En un disparo por `schedule` no hay inputs: `dry_run` llega vacío y cae
+        # al else, que es justo lo que se quiere (el cron traduce de verdad). El
+        # disparo manual, en cambio, viene con dry_run=true por defecto para que
+        # nadie gaste créditos sin querer.
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            node scripts/translate-catalog.mjs --dry-run
+          else
+            node scripts/translate-catalog.mjs
+          fi

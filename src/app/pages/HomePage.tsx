@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
-import { Link } from "react-router";
+import { LocaleLink as Link } from "../components/LocaleLink";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { PropertyCard, propertyMatchesOperation } from "../components/PropertyCard";
+import { propertyMatchesOperation, propertyStatusLabel } from "../components/PropertyCard";
 import { SearchBar, SearchFilters } from "../components/SearchBar";
 import { PropertyMap } from "../components/PropertyMap";
 import { useFeaturedHomeProperties } from "../hooks/useFeaturedHomeProperties";
@@ -22,6 +22,8 @@ import { Reveal } from "../components/Reveal";
 import { cn } from "../components/ui/utils";
 import { useInstagramFeed, type InstagramPost } from "../hooks/useInstagramFeed";
 import { optimizedImageUrl } from "../lib/supabaseImageUrl";
+import { useLocale } from "../i18n/LocaleContext";
+import { translatePropertyType } from "../i18n/catalogTerms";
 
 function SectionKicker({ children, tone = "dark" }: { children: ReactNode; tone?: "dark" | "light" }) {
   return (
@@ -40,7 +42,7 @@ function SectionKicker({ children, tone = "dark" }: { children: ReactNode; tone?
 }
 
 export function LazyInstagramCard({ post }: { post: InstagramPost }) {
-
+  const { t } = useLocale();
   const { shortcode, type, videoUrl, thumbnail, caption } = post;
   const [inView, setInView] = useState(false);
   const [useIframeFallback, setUseIframeFallback] = useState(false);
@@ -88,7 +90,7 @@ export function LazyInstagramCard({ post }: { post: InstagramPost }) {
             {thumbnail ? (
               <img
                 src={thumbnail}
-                alt={caption || "Publicación de Instagram"}
+                alt={caption || t("home.instagramAlt")}
                 className="absolute inset-0 h-full w-full object-cover opacity-30 blur-[2px]"
                 loading="lazy"
               />
@@ -113,7 +115,7 @@ export function LazyInstagramCard({ post }: { post: InstagramPost }) {
               src={`https://www.instagram.com/${type}/${shortcode}/embed/captioned`}
               scrolling="no"
               allow="encrypted-media; clipboard-write; picture-in-picture"
-              title={`Publicación de Instagram ${shortcode}`}
+              title={`${t("home.instagramAlt")} ${shortcode}`}
               style={{
                 display: "block",
                 width: "100%",
@@ -147,7 +149,7 @@ export function LazyInstagramCard({ post }: { post: InstagramPost }) {
               <div className="relative h-full w-full">
                 <img
                   src={thumbnail ?? ""}
-                  alt={caption || "Publicación de Instagram"}
+                  alt={caption || t("home.instagramAlt")}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   onError={() => setUseIframeFallback(true)}
                 />
@@ -162,10 +164,10 @@ export function LazyInstagramCard({ post }: { post: InstagramPost }) {
       {!(useIframeFallback || !hasMedia) && (
         <div className="p-4 border-t border-slate-100 min-h-[92px] flex flex-col justify-between">
           <p className="line-clamp-2 text-[13px] leading-relaxed text-slate-700 font-light">
-            {caption || "Descubre más detalles en nuestra publicación de Instagram."}
+            {caption || t("home.instagramCaptionFallback")}
           </p>
           <p className="mt-2 text-[10px] text-primary font-medium tracking-wide">
-            Ver detalles →
+            {t("card.seeDetails")} →
           </p>
         </div>
       )}
@@ -181,7 +183,7 @@ export function LazyInstagramCard({ post }: { post: InstagramPost }) {
           <span className="text-xs text-slate-500">@viterrainmobiliaria</span>
         </div>
         <span className="text-xs font-medium text-primary transition-colors group-hover:text-primary/70" style={{ fontWeight: 500 }}>
-          Ver en Instagram →
+          {t("home.viewOnInstagram")} →
         </span>
       </div>
     </a>
@@ -214,6 +216,7 @@ function HeroLoader() {
 
 export function HomePage() {
   const pl = usePreviewLayout();
+  const { locale, t } = useLocale();
   const reduceMotion = useReducedMotion();
   const { content, loading } = useSiteContent();
   const { posts: igPosts, loading: igLoading, error: igError, profileUrl: igProfileUrl } = useInstagramFeed(3);
@@ -552,14 +555,16 @@ export function HomePage() {
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>
                   {catalogLoading
-                    ? "Cargando mapa..."
-                    : `${filteredHomeMapProperties.length} ${filteredHomeMapProperties.length === 1 ? "propiedad" : "propiedades"}`}
+                    ? t("home.mapLoading")
+                    : filteredHomeMapProperties.length === 1
+                      ? t("home.mapCountOne")
+                      : t("home.mapCount", { count: filteredHomeMapProperties.length })}
                 </span>
               </div>
 
               {catalogLoading ? (
                 <div className="flex h-[320px] sm:h-[360px] lg:h-[400px] items-center justify-center bg-slate-900 text-white/70 text-sm font-light">
-                  Cargando mapa y ubicaciones del catálogo...
+                  {t("home.mapLoadingDetail")}
                 </div>
               ) : (
                 <PropertyMap
@@ -624,9 +629,7 @@ export function HomePage() {
             ) : featuredProperties.length === 0 ? (
               <div className="space-y-3 text-center">
                 <p className="text-sm text-brand-navy/60" style={{ fontWeight: 500 }}>
-                  {featuredError
-                    ? "No pudimos cargar las propiedades destacadas. Comprueba tu conexión e inténtalo de nuevo."
-                    : "No hay propiedades destacadas en este momento."}
+                  {featuredError ? t("home.featuredError") : t("home.featuredEmpty")}
                 </p>
                 {featuredError ? (
                   <button
@@ -683,11 +686,11 @@ export function HomePage() {
                           {/* Badges Flotantes sobre la foto */}
                           <div className="absolute top-3.5 left-3.5 flex flex-wrap gap-2 z-10">
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-white bg-primary/90 backdrop-blur-md px-2.5 py-1 rounded-md shadow-sm">
-                              {property.status === 'venta' ? 'En Venta' : 'En Renta'}
+                              {propertyStatusLabel(property.status, locale)}
                             </span>
                             {property.type && (
                               <span className="text-[10px] font-medium uppercase tracking-wider text-slate-900 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-md shadow-sm">
-                                {property.type}
+                                {translatePropertyType(property.type, locale)}
                               </span>
                             )}
                           </div>
@@ -712,12 +715,12 @@ export function HomePage() {
                             <div className="flex items-center gap-4 text-xs font-medium text-brand-navy/70 border-t border-slate-100 pt-3.5 mb-4">
                               {property.bedrooms > 0 && (
                                 <span className="flex items-center gap-1.5 tabular-nums">
-                                  <Bed className="w-4 h-4 text-brand-navy/45 stroke-[1.5]"/> {property.bedrooms} hab.
+                                  <Bed className="w-4 h-4 text-brand-navy/45 stroke-[1.5]"/> {property.bedrooms} {t("card.bedroomsShort")}
                                 </span>
                               )}
                               {property.bathrooms > 0 && (
                                 <span className="flex items-center gap-1.5 tabular-nums">
-                                  <Bath className="w-4 h-4 text-brand-navy/45 stroke-[1.5]"/> {property.bathrooms} baños
+                                  <Bath className="w-4 h-4 text-brand-navy/45 stroke-[1.5]"/> {property.bathrooms} {t("card.bathroomsShort")}
                                 </span>
                               )}
                               {property.area > 0 && (
@@ -730,16 +733,16 @@ export function HomePage() {
                             {/* Fila de precio y llamada a la acción */}
                             <div className="flex items-end justify-between border-t border-slate-100 pt-3.5">
                               <div>
-                                <p className="text-[10px] uppercase font-semibold tracking-wider text-brand-navy/45 mb-0.5">Precio</p>
+                                <p className="text-[10px] uppercase font-semibold tracking-wider text-brand-navy/45 mb-0.5">{t("card.priceLabel")}</p>
                                 <p className="text-xl sm:text-2xl font-light text-brand-navy tabular-nums" style={{ fontFamily: "var(--font-heading)" }}>
                                   ${property.price?.toLocaleString()}
                                   {property.status === 'alquiler' && (
-                                    <span className="text-xs text-brand-navy/50 ml-1 font-normal">/ mes</span>
+                                    <span className="text-xs text-brand-navy/50 ml-1 font-normal">{t("card.perMonth")}</span>
                                   )}
                                 </p>
                               </div>
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-primary tracking-wide transition-transform group-hover:translate-x-1">
-                                Ver detalles
+                                {t("card.seeDetails")}
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </span>
                             </div>
@@ -786,18 +789,25 @@ export function HomePage() {
       </PreviewSectionChrome>
 
       {/* Redes sociales — feed dinámico optimizado con Lazy Load */}
+      <PreviewSectionChrome blockId="home-social" label="Síguenos (Instagram)">
       <section className="relative bg-brand-canvas py-20 md:py-28 border-t border-brand-navy/10">
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="mb-14 text-center" y={24}>
             <p className="mb-4 text-[10px] font-normal uppercase tracking-[0.32em] text-brand-navy/55">
-              Síguenos
+              <PreviewFieldPulse blockId="home-social" fieldKey="home-social-kicker" layout="inline" className="inline-block">
+                {h.socialKicker}
+              </PreviewFieldPulse>
             </p>
             <span className="mx-auto mb-6 block h-px w-10 bg-primary" aria-hidden />
             <h2 className="font-heading text-3xl font-light leading-[1.12] tracking-tight text-brand-navy sm:text-4xl md:text-5xl">
-              Lo último en redes
+              <PreviewFieldPulse blockId="home-social" fieldKey="home-social-title" layout="inline" className="inline-block">
+                {h.socialTitle}
+              </PreviewFieldPulse>
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-[15px] font-light leading-relaxed text-brand-navy/70 md:text-base">
-              Mantente al día con nuestras publicaciones más recientes, proyectos y estilo de vida.
+              <PreviewFieldPulse blockId="home-social" fieldKey="home-social-subtitle" className="block">
+                {h.socialSubtitle}
+              </PreviewFieldPulse>
             </p>
           </Reveal>
 
@@ -819,7 +829,9 @@ export function HomePage() {
           ) : (
             <Reveal className="mx-auto max-w-lg text-center" y={16}>
               <p className="text-[15px] font-light text-brand-navy/70">
-                No pudimos cargar las 3 publicaciones ahora. Reintenta en unos segundos o ábrelo en Instagram.
+                <PreviewFieldPulse blockId="home-social" fieldKey="home-social-empty" className="block">
+                  {h.socialEmpty}
+                </PreviewFieldPulse>
               </p>
               <a
                 href={igProfileUrl}
@@ -828,7 +840,7 @@ export function HomePage() {
                 className="mt-5 inline-flex items-center gap-2 border border-brand-navy/15 bg-white px-5 py-2.5 text-[13px] uppercase tracking-[0.14em] text-brand-navy transition-colors hover:border-primary/40"
                 style={{ fontWeight: 500 }}
               >
-                Ver en Instagram
+                {t("home.viewOnInstagram")}
                 <ArrowRight className="h-4 w-4" />
               </a>
             </Reveal>
@@ -847,12 +859,15 @@ export function HomePage() {
                 <circle cx="12" cy="12" r="5" />
                 <circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
               </svg>
-              Síguenos en Instagram
+              <PreviewFieldPulse blockId="home-social" fieldKey="home-social-cta" layout="inline" className="inline-block">
+                {h.socialCta}
+              </PreviewFieldPulse>
               <ArrowRight className="h-4 w-4" />
             </a>
           </Reveal>
         </div>
       </section>
+      </PreviewSectionChrome>
 
       {/* Experiencia — navy marca + imagen */}
       <PreviewSectionChrome blockId="home-experience" label="Experiencia">

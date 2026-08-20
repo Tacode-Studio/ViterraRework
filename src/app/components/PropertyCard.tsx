@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "react-router";
-import { Bed, Bath, Square, MapPin, X, ArrowRight } from "lucide-react";
+import { Bed, Bath, Square, MapPin, X, ArrowRight, Heart } from "lucide-react";
 import { useState, useCallback } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { cn } from "./ui/utils";
+import { useWishlist } from "../contexts/WishlistContext";
 import {
   Dialog,
   DialogContent,
@@ -213,6 +214,8 @@ export function PropertyCard({
   const [previewOpen, setPreviewOpen] = useState(false);
   const ed = variant === "editorial";
   const navigate = useNavigate();
+  const { isFavorite, toggleFavorite } = useWishlist();
+  const isSaved = isFavorite(property.id);
 
   const openPreview = useCallback(() => {
     if (!disablePreview) setPreviewOpen(true);
@@ -286,6 +289,24 @@ export function PropertyCard({
               {property.type}
             </span>
           </div>
+          <button
+            type="button"
+            aria-label={isSaved ? "Quitar de favoritos" : "Guardar en favoritos"}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleFavorite(property.id);
+            }}
+            className={cn(
+              "absolute z-10 flex h-8 w-8 items-center justify-center border border-slate-200/80 bg-white/90 text-slate-700 shadow-md backdrop-blur-sm transition-all hover:scale-105 hover:bg-white hover:text-slate-900 focus-visible:outline-none",
+              ed ? "top-3 right-3" : "top-4 right-4"
+            )}
+          >
+            <Heart
+              className={cn("h-4 w-4 transition-colors", isSaved && "fill-[#C8102E] text-[#C8102E]")}
+              strokeWidth={isSaved ? 0 : 1.75}
+            />
+          </button>
         </div>
 
         <div

@@ -1,9 +1,9 @@
 import { Link } from "react-router";
 import { Heart, Star } from "lucide-react";
-import { useState } from "react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { cn } from "../ui/utils";
 import { propertyStatusLabel, type Property } from "../PropertyCard";
+import { useWishlist } from "../../contexts/WishlistContext";
 
 function demoRating(id: string): string {
   const n = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -17,7 +17,8 @@ type Props = {
 };
 
 export function MapSearchListingCard({ property, selected, onSelect }: Props) {
-  const [saved, setSaved] = useState(false);
+  const { isFavorite, toggleFavorite } = useWishlist();
+  const saved = isFavorite(property.id);
   const rating = demoRating(property.id);
   const isDual = property.status === "venta_y_alquiler";
 
@@ -52,10 +53,10 @@ export function MapSearchListingCard({ property, selected, onSelect }: Props) {
         <button
           type="button"
           className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center border-2 border-slate-200 bg-white/95 text-slate-700 shadow-sm transition-colors hover:border-slate-300"
-          aria-label={saved ? "Quitar de favoritos" : "Guardar"}
+          aria-label={saved ? "Quitar de favoritos" : "Guardar en favoritos"}
           onClick={(e) => {
             e.stopPropagation();
-            setSaved(!saved);
+            toggleFavorite(property.id);
           }}
         >
           <Heart

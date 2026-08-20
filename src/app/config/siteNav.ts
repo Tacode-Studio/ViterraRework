@@ -15,5 +15,8 @@ export function isActiveNavPath(pathname: string, to: string): boolean {
   if (to === "/desarrollos") {
     return pathname === "/desarrollos" || pathname.startsWith("/desarrollos/");
   }
+  if (to === "/favoritos") {
+    return pathname === "/favoritos";
+  }
   return pathname === to || pathname.startsWith(`${to}/`);
 }

@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Car,
   X,
+  Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
@@ -45,6 +46,7 @@ import { resolveTelHref, formatPhoneForDisplay } from "../lib/phoneLink";
 import { hasRichDescription, RICH_DESCRIPTION_HTML_CLASS, sanitizeRichHtml } from "../lib/propertyDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
 import { orientationLabel } from "../lib/propertyOrientation";
+import { useWishlist } from "../contexts/WishlistContext";
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
 const T = {
@@ -143,6 +145,7 @@ export function PropertyDetailPage() {
   const { id } = useParams();
   const location = useLocation();
   const { properties, loading } = useCatalogProperties();
+  const { isFavorite, toggleFavorite } = useWishlist();
   const { content } = useSiteContent();
   const contactSite = mergeSiteSection("contact", content.contact);
 
@@ -155,6 +158,8 @@ export function PropertyDetailPage() {
     () => properties.find((p) => p.id === id) ?? seededProperty,
     [properties, id, seededProperty],
   );
+
+  const isSaved = isFavorite(property?.id || "");
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -572,16 +577,27 @@ export function PropertyDetailPage() {
                   ) : null}
                 </div>
 
-                {/* Share — top right */}
-                <button
-                  type="button"
-                  aria-label="Copiar enlace de la publicación"
-                  onClick={(e) => { e.stopPropagation(); void handleShare(); }}
-                  className="absolute top-4 right-4 flex items-center justify-center"
-                  style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
-                >
-                  <Share2 className="w-3.5 h-3.5" style={{ color: T.navy }} strokeWidth={1.5} />
-                </button>
+                {/* Share & Favorite — top right */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label={isSaved ? "Quitar de favoritos" : "Guardar en favoritos"}
+                    onClick={(e) => { e.stopPropagation(); if (property?.id) toggleFavorite(property.id); }}
+                    className="flex items-center justify-center transition-all hover:scale-105"
+                    style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
+                  >
+                    <Heart className={cn("w-4 h-4 transition-colors", isSaved && "fill-[#C8102E] text-[#C8102E]")} style={{ color: isSaved ? "#C8102E" : T.navy }} strokeWidth={isSaved ? 0 : 1.75} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Copiar enlace de la publicación"
+                    onClick={(e) => { e.stopPropagation(); void handleShare(); }}
+                    className="flex items-center justify-center transition-all hover:scale-105"
+                    style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
+                  >
+                    <Share2 className="w-3.5 h-3.5" style={{ color: T.navy }} strokeWidth={1.5} />
+                  </button>
+                </div>
 
                 {/* Counter — bottom right (over vignette) */}
                 <div style={{
@@ -1003,6 +1019,21 @@ export function PropertyDetailPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Favorite action button */}
+                <button
+                  type="button"
+                  onClick={() => property?.id && toggleFavorite(property.id)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border py-2.5 text-xs font-semibold uppercase tracking-wider transition-all hover:shadow-sm"
+                  style={{
+                    borderColor: isSaved ? "#C8102E" : T.border,
+                    background: isSaved ? "rgba(200,16,46,0.06)" : T.white,
+                    color: isSaved ? "#C8102E" : T.navy,
+                  }}
+                >
+                  <Heart className={cn("h-4 w-4 transition-colors", isSaved && "fill-[#C8102E] text-[#C8102E]")} strokeWidth={isSaved ? 0 : 1.75} />
+                  {isSaved ? "Guardada en tus favoritos" : "Guardar en Favoritos"}
+                </button>
               </motion.div>
 
               {/* ── Details card ────────────────────────────────────────── */}

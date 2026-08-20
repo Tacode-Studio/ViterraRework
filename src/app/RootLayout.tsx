@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 import { AuthProvider } from "./contexts/AuthContext";
+import { WishlistProvider } from "./contexts/WishlistContext";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { trackPageView } from "./lib/googleAnalytics";
 
@@ -22,13 +23,16 @@ export function RootLayout() {
     <div className="relative isolate min-h-[100dvh] bg-brand-canvas">
       <ScrollToTop />
       <AuthProvider>
-        <div
-          key={pageKey}
-          className="min-h-[100dvh] w-full overflow-x-clip bg-brand-canvas"
-        >
-          <Outlet />
-        </div>
+        <WishlistProvider>
+          <div
+            key={pageKey}
+            className="min-h-[100dvh] w-full overflow-x-clip bg-brand-canvas"
+          >
+            <Outlet />
+          </div>
+        </WishlistProvider>
       </AuthProvider>
     </div>
   );
 }
+

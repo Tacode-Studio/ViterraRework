@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Heart } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePreviewCanvas } from "../../contexts/PreviewCanvasContext";
 import { useSitePreviewVirtualPath } from "../../contexts/SitePreviewVirtualPathContext";
@@ -8,6 +8,7 @@ import { PreviewSectionChrome } from "./admin/siteEditor/PreviewSectionChrome";
 import { SocialNavIcons } from "./SocialNavIcons";
 import { cn } from "./ui/utils";
 import { VITERRA_NAV_ITEMS, isActiveNavPath } from "../config/siteNav";
+import { useWishlist } from "../contexts/WishlistContext";
 
 /** Recorrido de scroll (px) para interpolar header (home e internas) */
 const SCROLL_RANGE = 200;
@@ -147,6 +148,7 @@ export function Header() {
   const suppressSitePreviewHeader = useSitePreviewSuppressHeader();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrollP, setScrollP] = useState(0);
+  const { count } = useWishlist();
   const location = useLocation();
   /** En el iframe del editor la URL real es `/admin/...`; la ruta simulada viene del contexto. */
   const routePath = sitePreviewPath ?? location.pathname;
@@ -354,6 +356,26 @@ export function Header() {
                   </Link>
                 );
               })}
+              <Link
+                to="/favoritos"
+                aria-label={`Ver Favoritos (${count})`}
+                className={cn(
+                  "relative inline-flex items-center gap-1.5 font-normal uppercase text-white/85 transition-colors hover:text-white shrink-0",
+                  isActiveNavPath(routePath, "/favoritos") && navLinkActiveClassCenter
+                )}
+                style={{ fontSize: `${navFontPx}px`, letterSpacing: `${navTrackEm}em` }}
+              >
+                <Heart
+                  className={cn("h-3.5 w-3.5 transition-colors", count > 0 ? "fill-[#C8102E] text-[#C8102E]" : "text-white/85")}
+                  strokeWidth={1.75}
+                />
+                <span>FAVORITOS</span>
+                {count > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#C8102E] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
+                    {count}
+                  </span>
+                )}
+              </Link>
             </div>
           </nav>
         </div>
@@ -424,7 +446,20 @@ export function Header() {
               </div>
             </div>
           </div>
-          <div className="relative col-start-2 z-[56] flex items-center justify-end justify-self-end sm:col-start-3">
+          <div className="relative col-start-2 z-[56] flex items-center justify-end gap-1 justify-self-end sm:col-start-3">
+            <Link
+              to="/favoritos"
+              aria-label={`Favoritos (${count})`}
+              className="relative p-2 text-white transition-colors hover:text-white/80"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Heart className={cn("h-5 w-5", count > 0 && "fill-[#C8102E] text-[#C8102E]")} strokeWidth={1.5} />
+              {count > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#C8102E] px-1 text-[9px] font-bold leading-none text-white">
+                  {count}
+                </span>
+              )}
+            </Link>
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -470,6 +505,27 @@ export function Header() {
                 </Link>
               );
             })}
+            <Link
+              to="/favoritos"
+              onClick={() => setIsMenuOpen(false)}
+              className={cn(
+                "flex items-center justify-between border-l-[3px] py-3 pl-4 pr-3 text-sm uppercase tracking-[0.14em] transition-colors",
+                isActiveNavPath(routePath, "/favoritos")
+                  ? "border-primary font-semibold text-white"
+                  : "border-transparent text-white/90 hover:text-white"
+              )}
+              aria-current={isActiveNavPath(routePath, "/favoritos") ? "page" : undefined}
+            >
+              <span className="flex items-center gap-2">
+                <Heart className={cn("h-4 w-4", count > 0 && "fill-[#C8102E] text-[#C8102E]")} />
+                Favoritos
+              </span>
+              {count > 0 && (
+                <span className="rounded-full bg-[#C8102E] px-2 py-0.5 text-xs font-bold text-white">
+                  {count}
+                </span>
+              )}
+            </Link>
             <div className="pt-3">
               <div className="border-t border-white/10 pt-3">
                 <div className="flex items-center justify-center">

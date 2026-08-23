@@ -15,7 +15,9 @@
     "test:e2e:report": "playwright show-report",
     "test:rls": "vitest run src/__tests__/integration/rlsPenetration.integration.test.ts",
     "test:rls:script": "node scripts/rls-penetration-test.mjs",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "translate:catalog": "node scripts/translate-catalog.mjs",
+    "translate:site": "node scripts/translate-site-content.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.3",

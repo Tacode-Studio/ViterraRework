@@ -20,7 +20,7 @@ export function DevelopmentDescriptionSection({ draft, onDraftChange, readOnly }
     <DevelopmentFormSection
       icon={AlignLeft}
       title="Descripción"
-      description="Tipo de proyecto, texto con formato para la ficha y resumen breve para listados."
+      description="Tipo de proyecto y texto con formato para la ficha. Las anotaciones son de respaldo o uso interno."
     >
       <DevelopmentFieldGrid>
         <DevelopmentField label="Tipo de desarrollo" span={2}>
@@ -34,9 +34,9 @@ export function DevelopmentDescriptionSection({ draft, onDraftChange, readOnly }
           />
         </DevelopmentField>
         <DevelopmentField
-          label="Descripción con diseño"
+          label="Descripción con formato"
           span={2}
-          hint="Negritas, listas y enlaces visibles en el sitio público."
+          hint="Es lo que ven los visitantes. Si la dejas vacía, se usará el texto de anotaciones como respaldo."
         >
           <RichDescriptionEditor
             value={draft.richDescription ?? ""}
@@ -46,16 +46,16 @@ export function DevelopmentDescriptionSection({ draft, onDraftChange, readOnly }
           />
         </DevelopmentField>
         <DevelopmentField
-          label="Descripción breve (opcional)"
+          label="Anotaciones"
           span={2}
-          hint="Texto plano para listados o como respaldo si no hay HTML."
+          hint="Pensado para notas del equipo. En el sitio solo se muestra si la descripción con formato está vacía."
         >
           <textarea
             className={developmentTextareaClass}
             rows={4}
             value={draft.description}
             disabled={readOnly}
-            placeholder="Resumen corto para tarjetas y SEO…"
+            placeholder="Notas internas o texto de respaldo…"
             onChange={(e) => onDraftChange({ description: e.target.value })}
           />
         </DevelopmentField>

@@ -384,7 +384,9 @@ export function AdminSiteEditor() {
     syncState === "syncing"
       ? "Guardando en la base de datos…"
       : syncState === "synced"
-        ? "Cambios guardados en el servidor."
+        ? editingLocale === "es"
+          ? "Guardado. Estructura sincronizada al inglés."
+          : "Cambios guardados en el servidor."
         : syncState === "error"
           ? "Error al guardar; revisa la conexión o permisos."
           : isDirty
@@ -466,45 +468,56 @@ export function AdminSiteEditor() {
    * así que se confirma antes de descartar cambios sin guardar.
    */
   const localeControls = (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/90 px-2 py-1.5">
-      <span
-        className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs"
-        title="Idioma que estás editando. El contenido en inglés se escribe a mano: elige EN y edita la página."
-      >
-        Idioma
-      </span>
-      <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
-        {LOCALES.map((l) => {
-          const active = l === editingLocale;
-          return (
-            <button
-              key={l}
-              type="button"
-              aria-pressed={active}
-              onClick={() => {
-                if (l === editingLocale) return;
-                if (
-                  isDirty &&
-                  !window.confirm(
-                    "Hay cambios sin guardar en esta página. Si cambias de idioma se descartarán. ¿Continuar?",
-                  )
-                ) {
-                  return;
-                }
-                setLocale(l);
-              }}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors sm:text-xs",
-                active
-                  ? "bg-brand-navy text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-100",
-              )}
-            >
-              {l}
-            </button>
-          );
-        })}
+    <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/90 px-2 py-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs"
+          title="Edita en español: al guardar, el inglés recibe la misma estructura (servicios, FAQs…). Los textos en inglés se editan en la pestaña EN."
+        >
+          Idioma
+        </span>
+        <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
+          {LOCALES.map((l) => {
+            const active = l === editingLocale;
+            return (
+              <button
+                key={l}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  if (l === editingLocale) return;
+                  if (
+                    isDirty &&
+                    !window.confirm(
+                      "Hay cambios sin guardar en esta página. Si cambias de idioma se descartarán. ¿Continuar?",
+                    )
+                  ) {
+                    return;
+                  }
+                  setLocale(l);
+                }}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors sm:text-xs",
+                  active
+                    ? "bg-brand-navy text-white"
+                    : "bg-white text-slate-600 hover:bg-slate-100",
+                )}
+              >
+                {l}
+              </button>
+            );
+          })}
+        </div>
       </div>
+      {editingLocale === "en" ? (
+        <p className="text-[10px] leading-snug text-slate-500 sm:text-[11px]">
+          Textos en inglés. Si agregas o quitas ítems, hazlo en español para que /en se alinee.
+        </p>
+      ) : (
+        <p className="text-[10px] leading-snug text-slate-500 sm:text-[11px]">
+          Al guardar se sincroniza la estructura al inglés (añadir/quitar servicios, etc.).
+        </p>
+      )}
     </div>
   );
 
@@ -734,7 +747,7 @@ export function AdminSiteEditor() {
                   <div
                     className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm"
                     role="group"
-                    aria-label="Mostrar la tarjeta en el grafo o en su página dedicada"
+                    aria-label="Mostrar el servicio en el listado o en su página dedicada"
                   >
                     <button
                       type="button"
@@ -747,7 +760,7 @@ export function AdminSiteEditor() {
                           : "text-slate-600 hover:text-slate-900"
                       )}
                     >
-                      Grafo
+                      Listado
                     </button>
                     <button
                       type="button"

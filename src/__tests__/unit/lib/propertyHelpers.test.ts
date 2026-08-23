@@ -15,6 +15,8 @@ import {
 import { countPropertyInventory } from "../../../app/lib/propertyInventory";
 import {
   hasRichDescription,
+  publicDescriptionPlainText,
+  resolvePublicDescription,
   sanitizeRichHtml,
 } from "../../../app/lib/propertyDescription";
 import {
@@ -86,16 +88,36 @@ describe("Property helpers", () => {
   });
 
   describe("propertyDescription", () => {
-    it("should detect non-empty rich description content", () => {
+    it("detecta contenido rico no vacío", () => {
       expect(hasRichDescription("<p>Description <strong>rich</strong></p>")).toBe(true);
       expect(hasRichDescription("<p></p>")).toBe(false);
       expect(hasRichDescription(null)).toBe(false);
     });
 
-    it("should sanitize rich HTML tags", () => {
+    it("sanitiza etiquetas HTML peligrosas", () => {
       const sanitized = sanitizeRichHtml("<script>alert('xss')</script><p>Safe</p>");
       expect(sanitized).not.toContain("<script>");
       expect(sanitized).toContain("<p>Safe</p>");
+    });
+
+    it("si hay descripción con formato, no mezcla la breve (evita duplicado Tokko)", () => {
+      const pub = resolvePublicDescription({
+        description: "El equilibrio perfecto entre inversión…",
+        richDescription: "<p>El equilibrio perfecto entre inversión…</p>",
+      });
+      expect(pub.kind).toBe("rich");
+      expect(pub.html).toContain("equilibrio");
+      expect(publicDescriptionPlainText({
+        description: "Notas privadas del asesor",
+        richDescription: "<p>Texto público</p>",
+      })).toBe("Texto público");
+    });
+
+    it("sin rica, usa la breve como respaldo público", () => {
+      expect(resolvePublicDescription({
+        description: "Solo Tokko plain",
+        richDescription: "",
+      })).toEqual({ kind: "plain", plain: "Solo Tokko plain" });
     });
   });
 

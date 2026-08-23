@@ -46,7 +46,11 @@ import { useLocale, type TranslateFn } from "../i18n/LocaleContext";
 import type { Locale } from "../i18n/locale";
 import { translateCatalogFeatures, translatePropertyType } from "../i18n/catalogTerms";
 import { resolveTelHref, formatPhoneForDisplay } from "../lib/phoneLink";
-import { hasRichDescription, RICH_DESCRIPTION_HTML_CLASS, sanitizeRichHtml } from "../lib/propertyDescription";
+import {
+  RICH_DESCRIPTION_HTML_CLASS,
+  resolvePublicDescription,
+  sanitizeRichHtml,
+} from "../lib/propertyDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
 import { orientationLabel } from "../lib/propertyOrientation";
 
@@ -695,32 +699,40 @@ export function PropertyDetailPage() {
                     transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
                   >
 
-                    {/* Descripción */}
+                    {/* Descripción: solo la con formato; la breve es privada (admin). */}
                     {activeTab === "descripcion" && (
                       <div className="space-y-4">
-                        {hasRichDescription(property.richDescription) ? (
-                          <>
-                            {property.description?.trim() ? (
-                              <p className="whitespace-pre-line text-[15px] leading-relaxed" style={{ color: T.body, lineHeight: 1.8 }}>
-                                {property.description.trim()}
+                        {(() => {
+                          const pub = resolvePublicDescription({
+                            description: property.description,
+                            richDescription: property.richDescription,
+                          });
+                          if (pub.kind === "rich") {
+                            return (
+                              <div
+                                className={cn(RICH_DESCRIPTION_HTML_CLASS, "pd-rich-desc")}
+                                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(pub.html) }}
+                              />
+                            );
+                          }
+                          if (pub.kind === "plain") {
+                            return (
+                              <p className="whitespace-pre-line text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
+                                {pub.plain}
                               </p>
-                            ) : null}
-                            <div className={cn(RICH_DESCRIPTION_HTML_CLASS, "pd-rich-desc")} dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(property.richDescription) }} />
-                          </>
-                        ) : property.description?.trim() ? (
-                          <p className="whitespace-pre-line text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
-                            {property.description.trim()}
-                          </p>
-                        ) : (
-                          <>
-                            <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
-                              {displayTitle} es una oportunidad excelente para quienes buscan una propiedad con distribución funcional, buena iluminación natural y acabados modernos.
-                            </p>
-                            <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
-                              Ubicada en {property.location}, esta propiedad combina conectividad, plusvalía y comodidad para vivir o invertir con visión de largo plazo.
-                            </p>
-                          </>
-                        )}
+                            );
+                          }
+                          return (
+                            <>
+                              <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
+                                {displayTitle} es una oportunidad excelente para quienes buscan una propiedad con distribución funcional, buena iluminación natural y acabados modernos.
+                              </p>
+                              <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
+                                Ubicada en {property.location}, esta propiedad combina conectividad, plusvalía y comodidad para vivir o invertir con visión de largo plazo.
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
 

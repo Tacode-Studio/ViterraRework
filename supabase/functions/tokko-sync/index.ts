@@ -495,8 +495,29 @@ function mapPropertyRow(item: Record<string, unknown>): Record<string, unknown> 
     lat: num(item.geo_lat ?? item.lat ?? item.latitude),
     lng: num(item.geo_long ?? item.lng ?? item.longitude ?? item.lon),
     development_tokko_id: developmentTokkoIdFromProperty(item),
-    description: str(item.description) ?? "",
-    rich_description: str(item.rich_description),
+    ...(() => {
+      /**
+       * Tokko a veces manda el mismo texto en `description` y `rich_description`.
+       * En el sitio, `description` es ahora anotación privada y `rich_description`
+       * es lo público. Evitamos duplicar: un solo campo público en rich.
+       */
+      const plain = str(item.description) ?? "";
+      const rich = str(item.rich_description);
+      const wrapPlain = (s: string) => {
+        const esc = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return esc
+          .split(/\n{2,}/)
+          .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+          .join("");
+      };
+      if (rich) {
+        return { description: "", rich_description: rich };
+      }
+      if (plain) {
+        return { description: "", rich_description: wrapPlain(plain) };
+      }
+      return { description: "", rich_description: null };
+    })(),
     amenities,
     services,
     additional_features,

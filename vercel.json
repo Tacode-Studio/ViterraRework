@@ -3,6 +3,14 @@
     "api/instagram-feed.ts": {
       "maxDuration": 30,
       "includeFiles": "api/_lib/**"
+    },
+    "api/translate-site-section.ts": {
+      "maxDuration": 60,
+      "includeFiles": "api/_lib/**,scripts/lib/**"
+    },
+    "api/translate-catalog-entity.ts": {
+      "maxDuration": 60,
+      "includeFiles": "api/_lib/**,scripts/lib/**"
     }
   },
   "headers": [

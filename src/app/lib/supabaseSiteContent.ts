@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SiteContent } from "../../data/siteContent";
 import { mergeSiteSection } from "../../lib/siteContentMerge";
-import { deepMerge } from "../../lib/deepMerge";
 import { DEFAULT_LOCALE, type Locale } from "../i18n/locale";
+import { syncLocaleStructureFromSource } from "./syncSiteContentLocale";
 
 export const SITE_CONTENT_PAGE_KEYS: (keyof SiteContent)[] = [
   "home",
@@ -23,25 +23,19 @@ export const SITE_STORAGE_BUCKET_ID = "site" as const;
 
 type SectionRow = { page: string; locale?: string | null; payload: unknown };
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
 /**
- * Payload efectivo de una página: lo traducido encima de lo que hay en el
- * idioma por defecto. Así una sección traducida a medias muestra en inglés los
- * campos ya traducidos y en español los que faltan, en vez de quedar vacía.
- *
- * Los arrays del patch sustituyen al base (regla de `deepMerge`), de modo que
- * una lista —tarjetas de servicios, FAQ— se traduce entera o no se traduce.
+ * Payload efectivo de una página: el español define la estructura (qué cards,
+ * FAQ, orden); el override EN solo aporta textos ya traducidos de ítems que
+ * siguen existiendo. Así un servicio borrado en ES desaparece en /en aunque la
+ * fila EN en DB aún tenga basura antigua.
  */
 export function resolveLocalizedPayload(
   base: unknown,
   override: unknown,
 ): unknown {
-  if (!isPlainObject(override)) return base;
-  if (!isPlainObject(base)) return override;
-  return deepMerge(base, override);
+  if (base == null) return override;
+  if (override == null) return base;
+  return syncLocaleStructureFromSource(base, override);
 }
 
 /** `undefined_column` de Postgres: la columna pedida no existe. */
@@ -115,16 +109,51 @@ export async function upsertSiteSection<K extends keyof SiteContent>(
   page: K,
   section: SiteContent[K],
   locale: Locale = DEFAULT_LOCALE,
+  options?: {
+    /** true cuando el admin guarda ajustes manuales en inglés. */
+    manualOverride?: boolean;
+    /** Hash del payload ES origen; lo escribe el pipeline de traducción en EN. */
+    sourceHash?: string | null;
+  },
 ) {
-  return client.from("site_content_sections").upsert(
-    {
-      page,
-      locale,
-      payload: section as unknown as Record<string, unknown>,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "page,locale" }
-  );
+  const row: Record<string, unknown> = {
+    page,
+    locale,
+    payload: section as unknown as Record<string, unknown>,
+    updated_at: new Date().toISOString(),
+  };
+  if (options?.manualOverride !== undefined) {
+    row.manual_override = options.manualOverride;
+  }
+  if (options?.sourceHash) {
+    row.source_hash = options.sourceHash;
+  }
+  return client.from("site_content_sections").upsert(row, { onConflict: "page,locale" });
+}
+
+/**
+ * Tras guardar ES: alinea la fila EN a la misma estructura (cards, FAQ, orden),
+ * conservando textos EN ya existentes. Sin IA.
+ */
+export async function syncSiteSectionEnFromEs<K extends keyof SiteContent>(
+  client: SupabaseClient,
+  page: K,
+  esSection: SiteContent[K],
+) {
+  const { data: enRow, error: readErr } = await client
+    .from("site_content_sections")
+    .select("payload")
+    .eq("page", page)
+    .eq("locale", "en")
+    .maybeSingle();
+
+  if (readErr) return { error: readErr };
+
+  const synced = syncLocaleStructureFromSource(esSection, enRow?.payload ?? null) as SiteContent[K];
+  return upsertSiteSection(client, page, synced, "en", {
+    manualOverride: false,
+    sourceHash: null,
+  });
 }
 
 function extensionForSiteUpload(file: File): string {

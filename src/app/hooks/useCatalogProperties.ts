@@ -26,12 +26,35 @@ export type UseCatalogPropertiesOptions = {
   omitPayload?: boolean;
 };
 
+const CATALOG_STORAGE_KEY = "viterra_catalog_cache_properties";
+
+function readCachedCatalog(locale: string): Property[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(`${CATALOG_STORAGE_KEY}_${locale}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedCatalog(locale: string, items: Property[]) {
+  if (typeof window === "undefined" || items.length === 0) return;
+  try {
+    sessionStorage.setItem(`${CATALOG_STORAGE_KEY}_${locale}`, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
   const { locale } = useLocale();
   const enabled = opts?.enabled !== false;
   const omitPayload = Boolean(opts?.omitPayload);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(() => enabled);
+  const [properties, setProperties] = useState<Property[]>(() => readCachedCatalog(locale));
+  const [loading, setLoading] = useState(() => enabled && readCachedCatalog(locale).length === 0);
   const [error, setError] = useState<string | null>(null);
   /** Aviso cuando el listado cargó sin columnas de medios/contacto (migración pendiente). */
   const [catalogSchemaWarning, setCatalogSchemaWarning] = useState<string | null>(null);
@@ -140,7 +163,9 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
           locale,
         });
         if (gen !== fetchGenerationRef.current) return;
-        setProperties(mapped.map((p) => applyPropertyTranslations(p, translations)));
+        const translatedList = mapped.map((p) => applyPropertyTranslations(p, translations));
+        setProperties(translatedList);
+        writeCachedCatalog(locale, translatedList);
         lastFetchedAtRef.current = Date.now();
         if (import.meta.env.DEV && list.length === 0) {
           void logTableCountHints(client, "properties");
@@ -161,8 +186,11 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
     // Skip automatic reload if data was fetched recently (e.g. user switching tabs back and forth).
     // Manual calls to reload() bypass this guard and always fetch fresh data.
     const ageMs = Date.now() - lastFetchedAtRef.current;
-    if (properties.length > 0 && ageMs < CATALOG_FRESH_MS) {
+    if (properties.length > 0) {
       setLoading(false);
+      if (ageMs > CATALOG_FRESH_MS || lastFetchedAtRef.current === 0) {
+        void reload({ silent: true });
+      }
       return;
     }
     void reload();

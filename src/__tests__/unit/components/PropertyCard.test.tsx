@@ -56,7 +56,7 @@ describe("PropertyCard & helper functions", () => {
       expect(screen.getByText(/4\s+Recámaras/)).toBeInTheDocument();
       expect(screen.getByText(/5\s+Baños/)).toBeInTheDocument();
       expect(screen.getByText("En venta")).toBeInTheDocument();
-      expect(screen.getByText("Ver Detalles")).toBeInTheDocument();
+      expect(screen.getByText(/Ver [Dd]etalles/i)).toBeInTheDocument();
     });
   });
 });

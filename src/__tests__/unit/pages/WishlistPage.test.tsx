@@ -5,6 +5,7 @@ import React from "react";
 import { WishlistPage } from "../../../app/pages/WishlistPage";
 import { WishlistProvider } from "../../../app/contexts/WishlistContext";
 import { SiteContentProvider } from "../../../contexts/SiteContentContext";
+import { LocaleProvider } from "../../../app/i18n/LocaleContext";
 import * as useCatalogPropertiesModule from "../../../app/hooks/useCatalogProperties";
 
 describe("WishlistPage Component", () => {
@@ -57,11 +58,13 @@ describe("WishlistPage Component", () => {
     }
     return render(
       <MemoryRouter>
-        <SiteContentProvider>
-          <WishlistProvider>
-            <WishlistPage />
-          </WishlistProvider>
-        </SiteContentProvider>
+        <LocaleProvider>
+          <SiteContentProvider>
+            <WishlistProvider>
+              <WishlistPage />
+            </WishlistProvider>
+          </SiteContentProvider>
+        </LocaleProvider>
       </MemoryRouter>
     );
   };

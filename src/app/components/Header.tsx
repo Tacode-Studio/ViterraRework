@@ -168,10 +168,11 @@ export function Header() {
   const isServicesPage = routePath === "/servicios";
   const isContactPage = routePath === "/contacto";
   const isAboutPage = routePath === "/nosotros";
+  const isWishlistPage = routePath === "/favoritos";
   /** Solo propiedades: lista/mapa sin hero “arriba del todo” como renta/venta — mantener barra compacta. Desarrollos tiene hero como el resto: usar scroll como `p`. */
   const lockHeaderInMode2 = isPropertiesSection;
   const useOverlayHeader =
-    isHome || isRentPage || isSalePage || isDevelopmentsPage || isServicesPage || isContactPage || isAboutPage;
+    isHome || isRentPage || isSalePage || isDevelopmentsPage || isServicesPage || isContactPage || isAboutPage || isWishlistPage;
   const rafRef = useRef<number | null>(null);
 
   const readScroll = useCallback(() => {
@@ -329,27 +330,29 @@ export function Header() {
           style={{ minHeight: `${navRowH}px` }}
         >
           {/* Misma franja que la marca (`left-8` + `markBoxW`): alineación por centro óptico de la V → icono X (ver constantes arriba). */}
-          <div className="pointer-events-none absolute inset-0 z-[55]">
+          <div className="pointer-events-none absolute inset-0 z-[59]">
             <div
-              className="pointer-events-auto absolute left-8 top-0 z-[56] flex h-full items-center justify-start overflow-visible sm:left-10"
+              className="pointer-events-none absolute left-8 top-0 z-[58] flex h-full items-center justify-start overflow-visible sm:left-10"
               style={{ width: markBoxW }}
             >
               <PreviewSectionChrome blockId="header-social" label="Redes del encabezado" compact hideLabel>
-                <span className="inline-flex shrink-0" style={{ marginLeft: desktopSocialMarginLeft }}>
+                <span className="pointer-events-auto inline-flex shrink-0" style={{ marginLeft: desktopSocialMarginLeft }}>
                   <SocialNavIcons iconSize="md" />
                 </span>
               </PreviewSectionChrome>
             </div>
             {/* Espejo del bloque de redes: la franja derecha estaba libre. */}
             <div
-              className="pointer-events-auto absolute right-8 top-0 z-[56] flex h-full items-center justify-end sm:right-10"
+              className="pointer-events-none absolute right-8 top-0 z-[58] flex h-full items-center justify-end sm:right-10"
               style={{ width: markBoxW }}
             >
-              <LanguageToggle />
+              <span className="pointer-events-auto inline-flex shrink-0">
+                <LanguageToggle />
+              </span>
             </div>
           </div>
           <nav
-            className="absolute inset-0 flex items-stretch"
+            className="absolute inset-0 z-[57] flex items-stretch"
             style={{
               transform: `translateY(${navLift}px)`,
               paddingLeft: "clamp(9rem, 16vw, 12rem)",
@@ -372,7 +375,7 @@ export function Header() {
                 );
               })}
               <Link
-                to="/favoritos"
+                to={localePath("/favoritos")}
                 aria-label={`Ver Favoritos (${count})`}
                 className={cn(
                   "relative inline-flex items-center gap-1.5 font-normal uppercase text-white/85 transition-colors hover:text-white shrink-0",
@@ -380,10 +383,6 @@ export function Header() {
                 )}
                 style={{ fontSize: `${navFontPx}px`, letterSpacing: `${navTrackEm}em` }}
               >
-                <Heart
-                  className={cn("h-3.5 w-3.5 transition-colors", count > 0 ? "fill-[#C8102E] text-[#C8102E]" : "text-white/85")}
-                  strokeWidth={1.75}
-                />
                 <span>FAVORITOS</span>
                 {count > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#C8102E] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
@@ -463,7 +462,7 @@ export function Header() {
           </div>
           <div className="relative col-start-2 z-[56] flex items-center justify-end gap-1 justify-self-end sm:col-start-3">
             <Link
-              to="/favoritos"
+              to={localePath("/favoritos")}
               aria-label={`Favoritos (${count})`}
               className="relative p-2 text-white transition-colors hover:text-white/80"
               onClick={() => setIsMenuOpen(false)}
@@ -521,7 +520,7 @@ export function Header() {
               );
             })}
             <Link
-              to="/favoritos"
+              to={localePath("/favoritos")}
               onClick={() => setIsMenuOpen(false)}
               className={cn(
                 "flex items-center justify-between border-l-[3px] py-3 pl-4 pr-3 text-sm uppercase tracking-[0.14em] transition-colors",
@@ -532,7 +531,6 @@ export function Header() {
               aria-current={isActiveNavPath(routePath, "/favoritos") ? "page" : undefined}
             >
               <span className="flex items-center gap-2">
-                <Heart className={cn("h-4 w-4", count > 0 && "fill-[#C8102E] text-[#C8102E]")} />
                 Favoritos
               </span>
               {count > 0 && (

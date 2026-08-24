@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { optimizedImageUrl } from "../lib/supabaseImageUrl";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "../components/ui/utils";
 import { FeatureSection } from "../components/FeatureSectionBlocks";
@@ -243,6 +244,16 @@ export function PropertyDetailPage() {
 
   useEffect(() => { setCurrentImageIndex(0); }, [property?.id, linkedDevelopment?.id]);
   useEffect(() => { setMapViewMode("map"); }, [property?.id]);
+
+  /* Preload gallery images into browser cache so navigation is instant */
+  useEffect(() => {
+    if (!propertyImages || propertyImages.length === 0) return;
+    propertyImages.forEach((imgUrl) => {
+      if (!imgUrl) return;
+      const img = new Image();
+      img.src = optimizedImageUrl(imgUrl, { width: 1600 });
+    });
+  }, [propertyImages]);
 
   const hasCatalogFeatureLists = useMemo(() => {
     if (!property) return false;
@@ -1199,6 +1210,7 @@ export function PropertyDetailPage() {
               className="max-h-[85vh] w-full rounded-lg object-contain"
               loading="eager"
               optimizeWidth={1600}
+              showLoadingSpinner
             />
             {propertyImages.length > 1 && (
               <>

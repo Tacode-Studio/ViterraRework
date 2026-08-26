@@ -31,6 +31,7 @@ import {
 } from "../config/heroLayout";
 import { displayDeliveryDate } from "../data/developments";
 import { optimizedImageUrl } from "../lib/supabaseImageUrl";
+import { publicDescriptionPlainText } from "../lib/propertyDescription";
 
 function FeaturedRowSkeleton({
   gridClass,
@@ -344,7 +345,10 @@ export function DevelopmentsPage() {
                     </h3>
 
                     <p className="font-heading mb-5 line-clamp-6 text-base font-normal leading-relaxed text-brand-navy/70 not-italic sm:mb-6 sm:line-clamp-5 sm:text-lg">
-                      {dev.description}
+                      {publicDescriptionPlainText({
+                        description: dev.description,
+                        richDescription: dev.richDescription,
+                      })}
                     </p>
 
                     <div className={cn("mb-6 grid gap-4 rounded-lg border border-brand-navy/10 bg-brand-canvas p-4 sm:p-6", pl.gridCols("grid-cols-1 sm:grid-cols-2"))}>
@@ -443,7 +447,10 @@ export function DevelopmentsPage() {
                     </h3>
 
                     <p className="font-heading mb-5 line-clamp-5 text-sm font-normal leading-relaxed text-brand-navy/70 not-italic sm:mb-6 sm:line-clamp-4">
-                      {dev.description}
+                      {publicDescriptionPlainText({
+                        description: dev.description,
+                        richDescription: dev.richDescription,
+                      })}
                     </p>
 
                     <div className="mb-5 grid grid-cols-2 gap-3 border-b border-brand-navy/10 pb-5 sm:mb-6 sm:gap-4 sm:pb-6">

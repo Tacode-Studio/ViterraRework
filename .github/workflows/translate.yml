@@ -1,8 +1,8 @@
 name: Traducción automática del catálogo ES→EN
 
-# Traduce SOLO el catálogo (propiedades y desarrollos), que es el texto que
-# entra por la importación de Tokko sin que nadie pueda traducirlo a mano. Los
-# textos del sitio se traducen desde el editor del admin, no aquí.
+# Traduce el catálogo (propiedades y desarrollos) y, bajo demanda manual,
+# el CMS del sitio con `node scripts/translate-site-content.mjs --all`.
+# Las ediciones en español desde el admin disparan traducción inmediata vía API.
 #
 # GitHub Actions y no un cron de Vercel a propósito: el Batch API puede tardar
 # desde minutos hasta horas en resolver un lote, y las funciones serverless de

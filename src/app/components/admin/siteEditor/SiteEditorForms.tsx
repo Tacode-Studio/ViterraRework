@@ -800,7 +800,7 @@ export function ServicesEditorForm({
         <LabeledField label="Título" editorFieldKey="services-hero-title">
           <TextInput value={safe.heroTitle} onChange={(v) => p({ heroTitle: v })} />
         </LabeledField>
-        <LabeledField label="Subtítulo" hint="Se muestra bajo el título; no afecta la posición de las flechas." editorFieldKey="services-hero-subtitle">
+        <LabeledField label="Subtítulo" hint="Se muestra bajo el título en la cabecera." editorFieldKey="services-hero-subtitle">
           <TextArea value={safe.heroSubtitle} onChange={(v) => p({ heroSubtitle: v })} rows={2} />
         </LabeledField>
       </EditorSection>
@@ -815,13 +815,13 @@ export function ServicesEditorForm({
           >
             Añadir servicio
           </button>
-          <span className="text-xs text-slate-500">Cada tarjeta es un nodo en el grafo y puede tener su propia página de detalle.</span>
+          <span className="text-xs text-slate-500">Cada servicio aparece como un ítem desplegable; puede tener página dedicada.</span>
         </div>
       )}
 
       {safe.cards.map((card, index) =>
         s(`services-card-${index}`) ? (
-        <EditorSection key={`services-card-${index}`} title={`Tarjeta ${index + 1}`} sectionId={`services-card-${index}`}>
+        <EditorSection key={`services-card-${index}`} title={`Servicio ${index + 1}`} sectionId={`services-card-${index}`}>
           <div className="mb-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -837,6 +837,20 @@ export function ServicesEditorForm({
           </LabeledField>
           <LabeledField label="Descripción" editorFieldKey={`services-card-${index}-description`}>
             <TextArea value={card.description} onChange={(v) => updateCard(index, { description: v })} rows={3} />
+          </LabeledField>
+          <LabeledField label="Etiqueta (badge)" hint="Texto corto opcional junto al título en el acordeón." editorFieldKey={`services-card-${index}-tag`}>
+            <TextInput value={card.tag ?? ""} onChange={(v) => updateCard(index, { tag: v })} />
+          </LabeledField>
+          <LabeledField label="Mostrar en el pie de página" editorFieldKey={`services-card-${index}-footer`}>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={card.showInFooter !== false}
+                onChange={(e) => updateCard(index, { showInFooter: e.target.checked })}
+                className="h-4 w-4 rounded border-slate-300 text-brand-navy focus:ring-primary/30"
+              />
+              Incluir en la columna Servicios del footer
+            </label>
           </LabeledField>
           {!card.primaryListingHref ? (
           <LabeledField label="Slug (URL)" hint="Solo minúsculas, números y guiones. URL: /servicios/d/tu-slug. No aplica si enlazas solo a un listado." editorFieldKey={`services-card-${index}-slug`}>
@@ -879,7 +893,7 @@ export function ServicesEditorForm({
               <option value="/desarrollos">Listado — Desarrollos</option>
             </select>
           </LabeledField>
-          <LabeledField label="Icono en el grafo" editorFieldKey={`services-card-${index}-icon`}>
+          <LabeledField label="Icono del servicio" editorFieldKey={`services-card-${index}-icon`}>
             <select
               value={card.iconKey}
               onChange={(e) => updateCard(index, { iconKey: e.target.value as (typeof SERVICE_ICON_KEYS)[number] })}
@@ -892,7 +906,7 @@ export function ServicesEditorForm({
               ))}
             </select>
           </LabeledField>
-          <LabeledField label="Viñetas (lista en el panel)" editorFieldKey={`services-card-${index}-bullets`}>
+          <LabeledField label="Viñetas (lista en el acordeón)" editorFieldKey={`services-card-${index}-bullets`}>
           <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
             {card.bullets.map((b, bi) => (
               <div key={`b-${index}-${bi}`} className="flex gap-2">
@@ -924,12 +938,12 @@ export function ServicesEditorForm({
             </button>
           </div>
           </LabeledField>
-          <LabeledField label="Texto del enlace al detalle" hint="El enlace lleva siempre a la página dedicada de este servicio." editorFieldKey={`services-card-${index}-linkLabel`}>
+          <LabeledField label="Texto del enlace al detalle" hint="Botón principal dentro del acordeón expandido." editorFieldKey={`services-card-${index}-linkLabel`}>
             <TextInput value={card.linkLabel} onChange={(v) => updateCard(index, { linkLabel: v })} />
           </LabeledField>
 
           <LabeledField
-            label="Enlaces rápidos (panel del grafo)"
+            label="Enlaces rápidos (acordeón)"
             hint="Con icono Teléfono solo indicas número (enlace tel: automático). El resto: URL https://, mailto:, etc. Hasta 12."
           >
             <div className="space-y-3">

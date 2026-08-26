@@ -22,10 +22,45 @@ describe("cadena de respaldo por idioma", () => {
     expect(resolveLocalizedPayload(undefined, override)).toEqual(override);
   });
 
-  it("los arrays se traducen enteros: el del override sustituye al base", () => {
-    const base = { faq: [{ question: "¿Precio?", answer: "Varía" }, { question: "¿Zona?", answer: "GDL" }] };
-    const override = { faq: [{ question: "Price?", answer: "It varies" }] };
-    expect(resolveLocalizedPayload(base, override)).toEqual(override);
+  it("los arrays siguen la estructura ES; EN solo aporta textos de ítems que siguen existiendo", () => {
+    const base = {
+      faq: [
+        { question: "¿Precio?", answer: "Varía", id: "price" },
+        { question: "¿Zona?", answer: "GDL", id: "zone" },
+      ],
+    };
+    const override = {
+      faq: [
+        { question: "Price?", answer: "It varies", id: "price" },
+        { question: "Orphan?", answer: "Gone", id: "orphan" },
+      ],
+    };
+    expect(resolveLocalizedPayload(base, override)).toEqual({
+      faq: [
+        { question: "Price?", answer: "It varies", id: "price" },
+        { question: "¿Zona?", answer: "GDL", id: "zone" },
+      ],
+    });
+  });
+
+  it("un servicio borrado en ES no aparece aunque EN aún lo tenga", () => {
+    const es = {
+      cards: [
+        { title: "Renta", slug: "renta" },
+        { title: "Venta", slug: "venta" },
+      ],
+    };
+    const enStale = {
+      cards: [
+        { title: "Rent", slug: "renta" },
+        { title: "Sale", slug: "venta" },
+        { title: "Legal advice", slug: "asesoria-legal" },
+      ],
+    };
+    const merged = resolveLocalizedPayload(es, enStale) as typeof es;
+    expect(merged.cards).toHaveLength(2);
+    expect(merged.cards.map((c) => c.slug)).toEqual(["renta", "venta"]);
+    expect(merged.cards[0].title).toBe("Rent");
   });
 
   it("respeta anidamiento profundo sin perder ramas hermanas", () => {

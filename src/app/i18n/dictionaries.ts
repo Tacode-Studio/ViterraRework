@@ -195,6 +195,9 @@ export const es = {
   "common.notFound": "No encontrado",
   "common.seeMore": "Ver más",
   "common.seeLess": "Ver menos",
+
+  /* Servicios */
+  "services.quickContact": "Contacto rápido",
 } as const;
 
 export type TranslationKey = keyof typeof es;
@@ -374,6 +377,8 @@ export const en: Record<TranslationKey, string> = {
   "common.notFound": "Not found",
   "common.seeMore": "See more",
   "common.seeLess": "See less",
+
+  "services.quickContact": "Quick contact",
 };
 
 export const DICTIONARIES = { es, en } as const;

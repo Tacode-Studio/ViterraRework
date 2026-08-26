@@ -381,7 +381,7 @@ export function PropertyFormDialog({
                       <PropertyFormSection
                         icon={FileText}
                         title="Información principal"
-                        description="Título, precio y textos que verán los visitantes."
+                        description="Título, precio y descripción pública. Las anotaciones son solo internas."
                       >
                         <div className="mb-5 rounded-xl border border-amber-200/60 bg-gradient-to-r from-amber-50 to-amber-50/30 px-4 py-3">
                           <div className="flex items-center justify-between gap-4">
@@ -499,21 +499,21 @@ export function PropertyFormDialog({
                             </PropertyField>
                           ) : null}
                           <PropertyField
-                            label="Descripción breve"
+                            label="Anotaciones"
                             span={2}
-                            hint="Opcional. La descripción con formato (abajo) es la que se muestra en la ficha pública; esta breve sirve solo como resumen."
+                            hint="Pensado para notas del equipo. En el sitio solo se muestra si la descripción con formato está vacía."
                           >
                             <textarea
                               className={propertyTextareaClass}
                               value={draft.description ?? ""}
                               onChange={(e) => patchDraft({ description: e.target.value })}
-                              placeholder="Resumen en pocas líneas…"
+                              placeholder="Notas internas o texto de respaldo…"
                             />
                           </PropertyField>
                           <PropertyField
-                            label="Descripción con formato (opcional)"
+                            label="Descripción con formato"
                             span={2}
-                            hint="Usa la barra de herramientas: negritas, listas, subtítulos y enlaces. No hace falta saber HTML."
+                            hint="Es lo que ven los visitantes. Si la dejas vacía, se usará el texto de anotaciones como respaldo."
                           >
                             <RichDescriptionEditor
                               value={draft.richDescription ?? ""}

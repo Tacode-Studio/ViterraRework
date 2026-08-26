@@ -10,7 +10,7 @@ import { PreviewFieldPulse } from "../components/admin/siteEditor/PreviewFieldPu
 import { PreviewSectionChrome } from "../components/admin/siteEditor/PreviewSectionChrome";
 import { HeroBackdropMedia } from "../components/HeroBackdropMedia";
 import { ViterraHeroTopClusterAnimated } from "../components/ViterraHeroTopClusterAnimated";
-import { ServicesSection } from "../components/ServicesSection";
+import { ServicesAccordionSection } from "../components/ServicesAccordionSection";
 import { Reveal } from "../components/Reveal";
 import {
   viterraHeroSectionClass,
@@ -92,30 +92,30 @@ export function ServicesPage() {
       </section>
       </PreviewSectionChrome>
 
-      <ServicesSection />
+      <ServicesAccordionSection />
 
       <PreviewSectionChrome blockId="services-cta" label="Llamado a la acción">
-      <section className="bg-brand-canvas py-24">
-        <Reveal className="mx-auto max-w-4xl px-6 text-center lg:px-8" y={26}>
+      <section className="border-t border-brand-navy/10 bg-brand-canvas py-10 sm:py-12 md:py-14">
+        <Reveal className="mx-auto max-w-3xl px-6 text-center lg:px-8" y={16}>
           <div>
-            <h2 className="font-heading mb-6 text-4xl font-light tracking-tight text-brand-navy md:text-5xl">
+            <h2 className="font-heading mb-3 text-2xl font-light tracking-tight text-brand-navy sm:mb-4 sm:text-3xl md:text-4xl">
               <PreviewFieldPulse blockId="services-cta" fieldKey="services-cta-title" className="block">
                 {s.ctaTitle}
               </PreviewFieldPulse>
             </h2>
-            <p className="font-heading mb-10 text-lg md:text-xl text-brand-navy/72 font-light not-italic">
+            <p className="font-heading mb-6 text-base font-light not-italic text-brand-navy/72 sm:mb-7 sm:text-lg">
               <PreviewFieldPulse blockId="services-cta" fieldKey="services-cta-subtitle" className="block">
                 {s.ctaSubtitle}
               </PreviewFieldPulse>
             </p>
-            <motion.div whileHover={reduceMotion ? undefined : { y: -3 }} transition={{ type: "spring", stiffness: 380, damping: 24 }}>
+            <motion.div whileHover={reduceMotion ? undefined : { y: -2 }} transition={{ type: "spring", stiffness: 380, damping: 24 }}>
               <Link
                 to="/contacto"
-                className="font-heading inline-flex items-center justify-center gap-2 rounded-xl bg-brand-navy px-10 py-4 text-white transition-all hover:bg-brand-burgundy font-medium"
+                className="font-heading inline-flex items-center justify-center gap-2 rounded-xl bg-brand-navy px-8 py-3 text-sm font-medium text-white transition-all hover:bg-brand-burgundy"
               >
                 <PreviewFieldPulse blockId="services-cta" fieldKey="services-cta-button" className="inline-flex items-center gap-2">
                   {s.ctaButton}
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-4 w-4" />
                 </PreviewFieldPulse>
               </Link>
             </motion.div>

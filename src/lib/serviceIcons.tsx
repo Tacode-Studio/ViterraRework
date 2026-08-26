@@ -26,13 +26,6 @@ import {
 } from "lucide-react";
 import type { ServiceIconKey } from "../data/siteContent";
 
-/** Misma convención que el grafo hexagonal: primer nodo arriba (270°), avance horario. */
-export function serviceOrbitAnglesDeg(count: number): number[] {
-  const n = Math.max(1, Math.floor(count));
-  const step = 360 / n;
-  return Array.from({ length: n }, (_, i) => (270 + i * step) % 360);
-}
-
 export const SERVICE_LUCIDE_MAP: Record<ServiceIconKey, LucideIcon> = {
   home: Home,
   building2: Building2,

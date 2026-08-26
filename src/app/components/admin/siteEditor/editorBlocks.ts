@@ -19,14 +19,14 @@ export function blockBelongsToEditorTab(blockId: string, tab: SiteKey): boolean 
   return blockId.startsWith(TAB_BLOCK_PREFIX[tab]);
 }
 
-/** Bloques del editor de la página Servicios en función del número de tarjetas. */
+/** Bloques del editor de la página Servicios en función del número de servicios. */
 export function getServicesEditorPageBlocks(cardCount: number): { id: string; label: string }[] {
   const n = Math.max(0, Math.floor(cardCount));
   return [
     { id: "services-hero", label: "Cabecera" },
     ...Array.from({ length: n }, (_, i) => ({
       id: `services-card-${i}`,
-      label: `Tarjeta ${i + 1}`,
+      label: `Servicio ${i + 1}`,
     })),
     { id: "services-cta", label: "Llamado a la acción" },
   ];

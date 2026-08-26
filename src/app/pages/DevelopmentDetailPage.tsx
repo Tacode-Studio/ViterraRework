@@ -28,7 +28,12 @@ import { getViterraStreetTileLayer } from "../lib/mapTileConfig";
 import { displayDeliveryDate } from "../data/developments";
 import { previewDevelopmentReferenceCode } from "../lib/developmentReferenceCode";
 import { developmentTours3dList, developmentVideosList } from "../lib/developmentMedia";
-import { hasRichDescription, RICH_DESCRIPTION_HTML_CLASS, sanitizeRichHtml } from "../lib/propertyDescription";
+import {
+  publicDescriptionPlainText,
+  resolvePublicDescription,
+  RICH_DESCRIPTION_HTML_CLASS,
+  sanitizeRichHtml,
+} from "../lib/propertyDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
 import {
   propertyTour3dDisplayTitle,
@@ -311,7 +316,10 @@ export function DevelopmentDetailPage() {
   }
 
   const descriptionNeedsExpand =
-    (hasRichDescription(development.richDescription) ? development.richDescription!.length : development.description.length) > DESCRIPTION_COLLAPSE_THRESHOLD;
+    (publicDescriptionPlainText({
+      description: development.description,
+      richDescription: development.richDescription,
+    }).length > DESCRIPTION_COLLAPSE_THRESHOLD);
 
   /* ── Render ──────────────────────────────────────────────────────────── */
   return (
@@ -540,23 +548,33 @@ export function DevelopmentDetailPage() {
                     transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
                   >
 
-                    {/* Descripción */}
+                    {/* Descripción: solo la con formato; la breve es privada (admin). */}
                     {activeTab === "descripcion" && (
                       <div className="space-y-4">
                         <div className={cn("relative", descriptionNeedsExpand && !descriptionExpanded && "pb-1")}>
                           <div className={cn("space-y-4", descriptionNeedsExpand && !descriptionExpanded && "max-h-[min(14rem,42vh)] overflow-hidden md:max-h-[min(16rem,38vh)]")}>
-                            {hasRichDescription(development.richDescription) ? (
-                              <>
-                                {development.description?.trim() ? (
-                                  <p className="whitespace-pre-line text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
-                                    {development.description.trim()}
+                            {(() => {
+                              const pub = resolvePublicDescription({
+                                description: development.description,
+                                richDescription: development.richDescription,
+                              });
+                              if (pub.kind === "rich") {
+                                return (
+                                  <div
+                                    className={cn(RICH_DESCRIPTION_HTML_CLASS, "dd-rich-desc")}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(pub.html) }}
+                                  />
+                                );
+                              }
+                              if (pub.kind === "plain") {
+                                return (
+                                  <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
+                                    {pub.plain}
                                   </p>
-                                ) : null}
-                                <div className={cn(RICH_DESCRIPTION_HTML_CLASS, "dd-rich-desc")} dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(development.richDescription) }} />
-                              </>
-                            ) : development.description?.trim() ? (
-                              <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>{development.description}</p>
-                            ) : null}
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                           {descriptionNeedsExpand && !descriptionExpanded ? (
                             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16" style={{ background: `linear-gradient(to top, ${T.white}, transparent)` }} aria-hidden />

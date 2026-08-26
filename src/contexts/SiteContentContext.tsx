@@ -11,6 +11,7 @@ import {
 import { getSupabaseClient } from "../app/lib/supabaseClient";
 import {
   fetchAllSiteSections,
+  syncSiteSectionEnFromEs,
   upsertAllDefaultSections,
   upsertSiteSection,
 } from "../app/lib/supabaseSiteContent";
@@ -221,13 +222,25 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
         if (!c) return;
         const section = contentRef.current[key];
         setSyncState("syncing");
-        const { error: upErr } = await upsertSiteSection(c, key, section, targetLocale);
+        const { error: upErr } = await upsertSiteSection(c, key, section, targetLocale, {
+          manualOverride: targetLocale !== DEFAULT_LOCALE ? true : false,
+        });
         if (upErr) {
           setError(upErr.message);
           setSyncState("error");
           return;
         }
         setError(null);
+
+        if (targetLocale === DEFAULT_LOCALE) {
+          const { error: syncErr } = await syncSiteSectionEnFromEs(c, key, section);
+          if (syncErr) {
+            setError(syncErr.message);
+            setSyncState("error");
+            return;
+          }
+        }
+
         setSyncState("synced");
         window.setTimeout(() => setSyncState((s) => (s === "synced" ? "idle" : s)), 2000);
       })();
@@ -339,7 +352,8 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
       return;
     }
     setSyncState("syncing");
-    const { error: upErr } = await upsertAllDefaultSections(client, normalized, localeRef.current);
+    const targetLocale = localeRef.current;
+    const { error: upErr } = await upsertAllDefaultSections(client, normalized, targetLocale);
     if (upErr) {
       setError(upErr.message);
       setSyncState("error");
@@ -347,6 +361,28 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
     }
     setError(null);
     setContent(normalized);
+
+    if (targetLocale === DEFAULT_LOCALE) {
+      for (const page of [
+        "home",
+        "header",
+        "footer",
+        "contact",
+        "services",
+        "about",
+        "developments",
+        "rent",
+        "sale",
+      ] as const) {
+        const { error: syncErr } = await syncSiteSectionEnFromEs(client, page, normalized[page]);
+        if (syncErr) {
+          setError(syncErr.message);
+          setSyncState("error");
+          return;
+        }
+      }
+    }
+
     setSyncState("synced");
     window.setTimeout(() => setSyncState((s) => (s === "synced" ? "idle" : s)), 2000);
   }, []);

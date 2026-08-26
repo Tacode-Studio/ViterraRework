@@ -3,6 +3,7 @@ import { useParams } from "react-router";
 import { LocaleLink as Link } from "../components/LocaleLink";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import {
   MapPin,
   Phone,
@@ -153,6 +154,16 @@ export function DevelopmentDetailPage() {
   const mapRef         = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const reduceMotion   = useReducedMotion();
+
+  /* Preload development images into browser cache so navigation is instant */
+  useEffect(() => {
+    if (!development?.images || development.images.length === 0) return;
+    development.images.forEach((imgUrl) => {
+      if (!imgUrl) return;
+      const img = new Image();
+      img.src = optimizedImageUrl(imgUrl, { width: 1600 });
+    });
+  }, [development?.images]);
 
   /* map */
   useEffect(() => {
@@ -421,13 +432,14 @@ export function DevelopmentDetailPage() {
                 onClick={() => setIsImageZoomOpen(true)}
                 style={{ height: "clamp(220px, 44vw, 510px)", background: "#e8e4de" }}
               >
-                <img
-                  src={optimizedImageUrl(development.images[currentImageIndex], { width: 1400 })}
+                <ImageWithFallback
+                  src={development.images[currentImageIndex]}
                   alt={development.name}
                   className="w-full h-full object-cover"
                   loading="eager"
                   fetchPriority="high"
-                  decoding="async"
+                  optimizeWidth={1400}
+                  showLoadingSpinner
                 />
                 {/* Bottom vignette */}
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(20,28,46,0.45) 0%, transparent 40%)", pointerEvents: "none" }} />
@@ -991,11 +1003,13 @@ export function DevelopmentDetailPage() {
           onClick={() => setIsImageZoomOpen(false)}
         >
           <div className="relative w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={optimizedImageUrl(development.images[currentImageIndex], { width: 1600 })}
+            <ImageWithFallback
+              src={development.images[currentImageIndex]}
               alt={development.name}
               className="max-h-[85vh] w-full rounded-lg object-contain"
               loading="eager"
+              optimizeWidth={1600}
+              showLoadingSpinner
             />
             <button
               type="button"

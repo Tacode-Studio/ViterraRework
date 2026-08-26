@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 import { AuthProvider } from "./contexts/AuthContext";
+import { WishlistProvider } from "./contexts/WishlistContext";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { trackPageView } from "./lib/googleAnalytics";
 import { LocaleProvider, useLocale } from "./i18n/LocaleContext";
@@ -43,14 +44,17 @@ export function RootLayout() {
       <LocaleProvider>
         <ContentLocaleBridge />
         <AuthProvider>
-          <div
-            key={pageKey}
-            className="min-h-[100dvh] w-full overflow-x-clip bg-brand-canvas"
-          >
-            <Outlet />
-          </div>
+          <WishlistProvider>
+            <div
+              key={pageKey}
+              className="min-h-[100dvh] w-full overflow-x-clip bg-brand-canvas"
+            >
+              <Outlet />
+            </div>
+          </WishlistProvider>
         </AuthProvider>
       </LocaleProvider>
     </div>
   );
 }
+

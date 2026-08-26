@@ -24,9 +24,11 @@ import {
   ChevronRight,
   Car,
   X,
+  Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { optimizedImageUrl } from "../lib/supabaseImageUrl";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "../components/ui/utils";
 import { FeatureSection } from "../components/FeatureSectionBlocks";
@@ -53,6 +55,7 @@ import {
 } from "../lib/propertyDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
 import { orientationLabel } from "../lib/propertyOrientation";
+import { useWishlist } from "../contexts/WishlistContext";
 
 /* ─── Design tokens ──────────────────────────────────────────────────────── */
 const T = {
@@ -169,6 +172,7 @@ export function PropertyDetailPage() {
   const location = useLocation();
   const { locale, t } = useLocale();
   const { properties, loading } = useCatalogProperties();
+  const { isFavorite, toggleFavorite } = useWishlist();
   const { content } = useSiteContent();
   const contactSite = mergeSiteSection("contact", content.contact);
 
@@ -181,6 +185,8 @@ export function PropertyDetailPage() {
     () => properties.find((p) => p.id === id) ?? seededProperty,
     [properties, id, seededProperty],
   );
+
+  const isSaved = isFavorite(property?.id || "");
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -242,6 +248,16 @@ export function PropertyDetailPage() {
 
   useEffect(() => { setCurrentImageIndex(0); }, [property?.id, linkedDevelopment?.id]);
   useEffect(() => { setMapViewMode("map"); }, [property?.id]);
+
+  /* Preload gallery images into browser cache so navigation is instant */
+  useEffect(() => {
+    if (!propertyImages || propertyImages.length === 0) return;
+    propertyImages.forEach((imgUrl) => {
+      if (!imgUrl) return;
+      const img = new Image();
+      img.src = optimizedImageUrl(imgUrl, { width: 1600 });
+    });
+  }, [propertyImages]);
 
   const hasCatalogFeatureLists = useMemo(() => {
     if (!property) return false;
@@ -608,16 +624,27 @@ export function PropertyDetailPage() {
                   ) : null}
                 </div>
 
-                {/* Share — top right */}
-                <button
-                  type="button"
-                  aria-label={t("detail.copyLink")}
-                  onClick={(e) => { e.stopPropagation(); void handleShare(); }}
-                  className="absolute top-4 right-4 flex items-center justify-center"
-                  style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
-                >
-                  <Share2 className="w-3.5 h-3.5" style={{ color: T.navy }} strokeWidth={1.5} />
-                </button>
+                {/* Share & Favorite — top right */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label={isSaved ? "Quitar de favoritos" : "Guardar en favoritos"}
+                    onClick={(e) => { e.stopPropagation(); if (property?.id) toggleFavorite(property.id); }}
+                    className="flex items-center justify-center transition-all hover:scale-105"
+                    style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
+                  >
+                    <Heart className={cn("w-4 h-4 transition-colors", isSaved && "fill-[#C8102E] text-[#C8102E]")} style={{ color: isSaved ? "#C8102E" : T.navy }} strokeWidth={isSaved ? 0 : 1.75} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("detail.copyLink")}
+                    onClick={(e) => { e.stopPropagation(); void handleShare(); }}
+                    className="flex items-center justify-center transition-all hover:scale-105"
+                    style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)", border: `1px solid ${T.border}` }}
+                  >
+                    <Share2 className="w-3.5 h-3.5" style={{ color: T.navy }} strokeWidth={1.5} />
+                  </button>
+                </div>
 
                 {/* Counter — bottom right (over vignette) */}
                 <div style={{
@@ -1047,6 +1074,21 @@ export function PropertyDetailPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Favorite action button */}
+                <button
+                  type="button"
+                  onClick={() => property?.id && toggleFavorite(property.id)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border py-2.5 text-xs font-semibold uppercase tracking-wider transition-all hover:shadow-sm"
+                  style={{
+                    borderColor: isSaved ? "#C8102E" : T.border,
+                    background: isSaved ? "rgba(200,16,46,0.06)" : T.white,
+                    color: isSaved ? "#C8102E" : T.navy,
+                  }}
+                >
+                  <Heart className={cn("h-4 w-4 transition-colors", isSaved && "fill-[#C8102E] text-[#C8102E]")} strokeWidth={isSaved ? 0 : 1.75} />
+                  {isSaved ? "Guardada en tus favoritos" : "Guardar en Favoritos"}
+                </button>
               </motion.div>
 
               {/* ── Details card ────────────────────────────────────────── */}
@@ -1180,6 +1222,7 @@ export function PropertyDetailPage() {
               className="max-h-[85vh] w-full rounded-lg object-contain"
               loading="eager"
               optimizeWidth={1600}
+              showLoadingSpinner
             />
             {propertyImages.length > 1 && (
               <>

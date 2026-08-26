@@ -1,12 +1,13 @@
 import { useNavigate } from "react-router";
 import { LocaleLink as Link } from "./LocaleLink";
-import { Bed, Bath, Square, MapPin, X, ArrowRight } from "lucide-react";
+import { Bed, Bath, Square, MapPin, X, ArrowRight, Heart } from "lucide-react";
 import { useState, useCallback } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { cn } from "./ui/utils";
 import { DEFAULT_LOCALE, type Locale } from "../i18n/locale";
 import { translatePropertyStatus, translatePropertyType } from "../i18n/catalogTerms";
 import { useLocale } from "../i18n/LocaleContext";
+import { useWishlist } from "../contexts/WishlistContext";
 import {
   Dialog,
   DialogContent,
@@ -226,6 +227,8 @@ export function PropertyCard({
   const ed = variant === "editorial";
   const navigate = useNavigate();
   const { locale, localePath, t } = useLocale();
+  const { isFavorite, toggleFavorite } = useWishlist();
+  const isSaved = isFavorite(property.id);
 
   const openPreview = useCallback(() => {
     if (!disablePreview) setPreviewOpen(true);
@@ -252,13 +255,12 @@ export function PropertyCard({
         <div
           role="button"
           tabIndex={0}
-          onClick={mapSearchSelection ? handleMapSearchSurface : disablePreview ? goToDetails : openPreview}
+          onClick={mapSearchSelection ? handleMapSearchSurface : goToDetails}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               if (mapSearchSelection) handleMapSearchSurface();
-              else if (disablePreview) goToDetails();
-              else openPreview();
+              else goToDetails();
             }
           }}
           className={cn(
@@ -299,6 +301,24 @@ export function PropertyCard({
               {translatePropertyType(property.type, locale)}
             </span>
           </div>
+          <button
+            type="button"
+            aria-label={isSaved ? "Quitar de favoritos" : "Guardar en favoritos"}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleFavorite(property.id);
+            }}
+            className={cn(
+              "absolute z-10 flex h-8 w-8 items-center justify-center border border-slate-200/80 bg-white/90 text-slate-700 shadow-md backdrop-blur-sm transition-all hover:scale-105 hover:bg-white hover:text-slate-900 focus-visible:outline-none",
+              ed ? "top-3 right-3" : "top-4 right-4"
+            )}
+          >
+            <Heart
+              className={cn("h-4 w-4 transition-colors", isSaved && "fill-[#C8102E] text-[#C8102E]")}
+              strokeWidth={isSaved ? 0 : 1.75}
+            />
+          </button>
         </div>
 
         <div
@@ -310,7 +330,7 @@ export function PropertyCard({
         >
           <button
             type="button"
-            onClick={mapSearchSelection ? handleMapSearchSurface : openPreview}
+            onClick={mapSearchSelection ? handleMapSearchSurface : goToDetails}
             className={cn("w-full text-left", ed && "min-w-0")}
           >
             <h3
@@ -409,7 +429,7 @@ export function PropertyCard({
             </div>
             {ed ? (
               <Link
-                to={`/propiedades/${property.id}`}
+                to={localePath(`/propiedades/${property.id}`)}
                 state={{ property }}
                 className="mt-4 inline-flex w-fit shrink-0 items-center gap-2 border-b border-brand-navy/20 pb-0.5 text-[10px] font-medium uppercase tracking-[0.2em] text-brand-navy/80 transition-colors hover:border-primary hover:text-primary"
               >
@@ -427,7 +447,7 @@ export function PropertyCard({
                   Vista previa
                 </button>
                 <Link
-                  to={`/propiedades/${property.id}`}
+                  to={localePath(`/propiedades/${property.id}`)}
                   state={{ property }}
                   onClick={() => onMapSearchSelect?.()}
                   className="group/btn inline-flex items-center gap-2 rounded-none px-5 py-2.5 text-sm font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
@@ -438,9 +458,9 @@ export function PropertyCard({
                   {t("card.seeDetails")}
                 </Link>
               </div>
-            ) : disablePreview ? (
+            ) : (
               <Link
-                to={`/propiedades/${property.id}`}
+                to={localePath(`/propiedades/${property.id}`)}
                 state={{ property }}
                 className="group/btn inline-flex items-center gap-2 rounded-none px-5 py-2.5 text-sm font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
                 style={{ fontWeight: 600, backgroundColor: "#C8102E" }}
@@ -449,17 +469,6 @@ export function PropertyCard({
               >
                 {t("card.seeDetails")}
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={openPreview}
-                className="group/btn inline-flex items-center gap-2 rounded-none px-5 py-2.5 text-sm font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
-                style={{ fontWeight: 600, backgroundColor: "#C8102E" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#a00d25")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#C8102E")}
-              >
-                Ver Detalles
-              </button>
             )}
           </div>
         </div>

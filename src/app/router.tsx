@@ -40,6 +40,7 @@ const PUBLIC_PAGES: PublicPage[] = [
   { path: "/desarrollos/:id", load: () => import("./pages/DevelopmentDetailPage"), exportName: "DevelopmentDetailPage" },
   { path: "/nosotros", load: () => import("./pages/AboutPage"), exportName: "AboutPage" },
   { path: "/contacto", load: () => import("./pages/ContactPage"), exportName: "ContactPage" },
+  { path: "/favoritos", load: () => import("./pages/WishlistPage"), exportName: "WishlistPage" },
   { path: "/aviso-de-privacidad", load: () => import("./pages/AvisoDePrivacidadPage"), exportName: "AvisoDePrivacidadPage" },
 ];
 

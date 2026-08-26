@@ -196,6 +196,19 @@ export const es = {
   "common.seeMore": "Ver más",
   "common.seeLess": "Ver menos",
 
+  /* Wishlist / Favoritos */
+  "wishlist.heroKicker": "Lista de Deseos",
+  "wishlist.heroTitle": "Mis Favoritos",
+  "wishlist.heroSubtitle": "Tus propiedades guardadas en este dispositivo para consultar en cualquier momento.",
+  "wishlist.savedCountOne": "1 propiedad guardada",
+  "wishlist.savedCount": "{count} propiedades guardadas",
+  "wishlist.clearList": "Vaciar lista",
+  "wishlist.emptyTitle": "Aún no tienes favoritos guardados",
+  "wishlist.emptyBody": "Guarda las propiedades que más te gusten haciendo clic en el ícono de corazón disponible en los listados y fichas de detalle.",
+  "wishlist.browseSale": "Ver en Venta",
+  "wishlist.browseRent": "Ver en Renta",
+  "wishlist.browseMap": "Buscar en Mapa",
+
   /* Servicios */
   "services.quickContact": "Contacto rápido",
 } as const;
@@ -377,6 +390,19 @@ export const en: Record<TranslationKey, string> = {
   "common.notFound": "Not found",
   "common.seeMore": "See more",
   "common.seeLess": "See less",
+
+  /* Wishlist */
+  "wishlist.heroKicker": "Private Wishlist",
+  "wishlist.heroTitle": "My Favorites",
+  "wishlist.heroSubtitle": "Your saved properties on this device, available to review at any time.",
+  "wishlist.savedCountOne": "1 saved property",
+  "wishlist.savedCount": "{count} saved properties",
+  "wishlist.clearList": "Clear list",
+  "wishlist.emptyTitle": "You haven't saved any favorites yet",
+  "wishlist.emptyBody": "Save the properties you like by clicking the heart icon available on the listings and detail pages.",
+  "wishlist.browseSale": "Browse for Sale",
+  "wishlist.browseRent": "Browse for Rent",
+  "wishlist.browseMap": "Search on Map",
 
   "services.quickContact": "Quick contact",
 };

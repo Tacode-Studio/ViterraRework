@@ -47,7 +47,7 @@ function PropertyGridSkeleton() {
 export function WishlistPage() {
   const { favoriteIds, clearFavorites, count } = useWishlist();
   const { properties, loading } = useCatalogProperties();
-  const { locale, t } = useLocale();
+  const { t } = useLocale();
   const reduceMotion = useReducedMotion();
   const pl = usePreviewLayout();
   const [sortBy, setSortBy] = useState<CatalogPropertySortKey>("newest");
@@ -104,17 +104,17 @@ export function WishlistPage() {
               animate="visible"
             >
               <ViterraHeroTopClusterAnimated
-                kicker={locale === "en" ? "Private Wishlist" : "Lista de Deseos"}
+                kicker={t("wishlist.heroKicker")}
                 itemVariants={heroItemVariants}
                 reduceMotion={!!reduceMotion}
               />
               <motion.div variants={heroItemVariants} className={viterraHeroMainClass}>
                 <h1 className={pl.heroTitleClass()}>
-                  Mis Favoritos
+                  {t("wishlist.heroTitle")}
                 </h1>
               </motion.div>
               <motion.p variants={heroItemVariants} className={viterraHeroSubtitleClass}>
-                Tus propiedades guardadas en este dispositivo para consultar en cualquier momento.
+                {t("wishlist.heroSubtitle")}
               </motion.p>
             </motion.div>
           </div>
@@ -136,8 +136,8 @@ export function WishlistPage() {
                     <SlidersHorizontal className="h-5 w-5 text-primary" strokeWidth={1.5} aria-hidden />
                     <p className="font-heading text-sm font-medium text-brand-navy/90 not-italic">
                       {displayedProperties.length === 1
-                        ? "1 propiedad guardada"
-                        : `${displayedProperties.length} propiedades guardadas`}
+                        ? t("wishlist.savedCountOne")
+                        : t("wishlist.savedCount", { count: displayedProperties.length })}
                     </p>
                   </div>
 
@@ -160,7 +160,7 @@ export function WishlistPage() {
                       className="font-heading inline-flex items-center gap-2 rounded-lg border border-brand-navy/15 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-brand-navy transition-colors hover:border-primary hover:text-primary"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span>Vaciar lista</span>
+                      <span>{t("wishlist.clearList")}</span>
                     </button>
                   </div>
                 </Reveal>
@@ -179,10 +179,10 @@ export function WishlistPage() {
                 <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-slate-50/60 p-8 text-center shadow-sm sm:p-12">
                   <Heart className="mx-auto mb-6 h-12 w-12 text-primary stroke-[1.25]" />
                   <h2 className="font-heading text-2xl font-semibold text-slate-900 sm:text-3xl">
-                    Aún no tienes favoritos guardados
+                    {t("wishlist.emptyTitle")}
                   </h2>
                   <p className="mx-auto mt-3 max-w-md text-sm font-normal leading-relaxed text-slate-600">
-                    Guarda las propiedades que más te gusten haciendo clic en el ícono de corazón disponible en los listados y fichas de detalle.
+                    {t("wishlist.emptyBody")}
                   </p>
                   <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                     <Link
@@ -190,21 +190,21 @@ export function WishlistPage() {
                       className="font-heading inline-flex items-center gap-2 rounded-lg bg-[#C8102E] px-5 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition-all hover:bg-[#a00d25] hover:shadow"
                     >
                       <Building2 className="h-4 w-4" />
-                      Ver en Venta
+                      {t("wishlist.browseSale")}
                     </Link>
                     <Link
                       to="/renta"
                       className="font-heading inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-slate-800 transition-all hover:border-slate-400 hover:bg-slate-50"
                     >
                       <Key className="h-4 w-4 text-slate-600" />
-                      Ver en Renta
+                      {t("wishlist.browseRent")}
                     </Link>
                     <Link
                       to="/propiedades/mapa"
                       className="font-heading inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-slate-800 transition-all hover:border-slate-400 hover:bg-slate-50"
                     >
                       <MapPin className="h-4 w-4 text-slate-600" />
-                      Buscar en Mapa
+                      {t("wishlist.browseMap")}
                     </Link>
                   </div>
                 </div>

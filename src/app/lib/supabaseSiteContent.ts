@@ -87,8 +87,25 @@ export async function fetchAllSiteSections(
     else if (rowLocale === locale) override[p] = r.payload;
   }
 
+  /**
+   * La estructura la marca el español, pero el origen tiene que ser la fila ES
+   * **fusionada con los valores del bundle**, no la fila cruda.
+   *
+   * `syncLocaleStructureFromSource` recorre las claves del origen: una clave que
+   * solo exista en la fila EN se descarta. Y la fila ES solo contiene lo que
+   * alguien guardó alguna vez, así que cada campo nuevo del CMS nace ausente
+   * ahí. Con la fila cruda como origen, la traducción al inglés de un campo
+   * recién añadido se guardaba bien y desaparecía al leerla, cayendo al valor
+   * por defecto en español, y sin ningún error visible.
+   *
+   * Fusionar con los defaults hace que el origen tenga siempre el esquema
+   * completo. Las listas siguen viniendo de ES (`deepMerge` sustituye arrays),
+   * así que dar de baja un servicio en español se sigue reflejando en /en.
+   */
   const payloadFor = (p: SiteContentPageKey) =>
-    locale === DEFAULT_LOCALE ? base[p] : resolveLocalizedPayload(base[p], override[p]);
+    locale === DEFAULT_LOCALE
+      ? base[p]
+      : resolveLocalizedPayload(mergeSiteSection(p, base[p]), override[p]);
 
   return {
     home: mergeSiteSection("home", payloadFor("home")),

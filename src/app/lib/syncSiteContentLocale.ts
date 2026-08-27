@@ -106,5 +106,20 @@ export function syncLocaleStructureFromSource(
     return out;
   }
 
+  /**
+   * Cadena suelta: solo llega aquí como elemento de un array —los `bullets` de
+   * una tarjeta, los `items` de una lista—, porque las cadenas que son valor de
+   * una propiedad se resuelven arriba sin recursión.
+   *
+   * Es contenido traducible igual que aquellas, así que se aplica el mismo
+   * criterio: si el idioma destino ya tiene texto, se conserva. Sin esto se
+   * devolvía el español y la traducción se perdía en silencio al leerla.
+   */
+  if (typeof source === "string") {
+    return typeof previousTarget === "string" && previousTarget.trim().length > 0
+      ? previousTarget
+      : source;
+  }
+
   return source;
 }

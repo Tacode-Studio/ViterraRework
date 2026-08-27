@@ -18,6 +18,7 @@ export const es = {
   "nav.services": "SERVICIOS",
   "nav.about": "NOSOTROS",
   "nav.contact": "CONTACTO",
+  "nav.favorites": "FAVORITOS",
 
   /* Selector de idioma */
   "locale.switchLabel": "Cambiar idioma",
@@ -223,6 +224,7 @@ export const en: Record<TranslationKey, string> = {
   "nav.services": "SERVICES",
   "nav.about": "ABOUT US",
   "nav.contact": "CONTACT",
+  "nav.favorites": "FAVORITES",
 
   "locale.switchLabel": "Change language",
   "locale.es": "Español",

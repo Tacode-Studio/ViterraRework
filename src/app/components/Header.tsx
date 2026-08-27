@@ -376,7 +376,7 @@ export function Header() {
               })}
               <Link
                 to={localePath("/favoritos")}
-                aria-label={`Ver Favoritos (${count})`}
+                aria-label={`${t("nav.favorites")} (${count})`}
                 className={cn(
                   "relative inline-flex items-center gap-1.5 font-normal uppercase text-white/85 transition-colors hover:text-white shrink-0",
                   isActiveNavPath(routePath, "/favoritos") && navLinkActiveClassCenter
@@ -463,7 +463,7 @@ export function Header() {
           <div className="relative col-start-2 z-[56] flex items-center justify-end gap-1 justify-self-end sm:col-start-3">
             <Link
               to={localePath("/favoritos")}
-              aria-label={`Favoritos (${count})`}
+              aria-label={`${t("nav.favorites")} (${count})`}
               className="relative p-2 text-white transition-colors hover:text-white/80"
               onClick={() => setIsMenuOpen(false)}
             >
@@ -531,7 +531,7 @@ export function Header() {
               aria-current={isActiveNavPath(routePath, "/favoritos") ? "page" : undefined}
             >
               <span className="flex items-center gap-2">
-                Favoritos
+                {t("nav.favorites")}
               </span>
               {count > 0 && (
                 <span className="rounded-full bg-[#C8102E] px-2 py-0.5 text-xs font-bold text-white">

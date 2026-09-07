@@ -15,6 +15,7 @@ import {
 import { countPropertyInventory } from "../../../app/lib/propertyInventory";
 import {
   hasRichDescription,
+  parseStructuredDescription,
   publicDescriptionPlainText,
   resolvePublicDescription,
   sanitizeRichHtml,
@@ -118,6 +119,21 @@ describe("Property helpers", () => {
         description: "Solo Tokko plain",
         richDescription: "",
       })).toEqual({ kind: "plain", plain: "Solo Tokko plain" });
+    });
+
+    it("separa palabras clave y viñetas como en la ficha PDF", () => {
+      const blocks = parseStructuredDescription(
+        "El equilibrio perfecto.\nCaracterísticas:\n* 3 recámaras\n* 2 baños\nAmenidades: * Alberca * Gym",
+      );
+      expect(blocks).toEqual([
+        { type: "paragraph", text: "El equilibrio perfecto." },
+        { type: "header", text: "Características" },
+        { type: "bullet", text: "3 recámaras" },
+        { type: "bullet", text: "2 baños" },
+        { type: "header", text: "Amenidades" },
+        { type: "bullet", text: "Alberca" },
+        { type: "bullet", text: "Gym" },
+      ]);
     });
   });
 

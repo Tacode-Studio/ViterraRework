@@ -226,9 +226,9 @@ export function Header() {
   const subtitleOpacity = 1 - smoothstep01(p, 0.05, 0.42);
   const subtitleMaxH = lerp(40, 0, smoothstep01(p, 0.08, 0.45));
   const navRowH = lerp(52, 46, p);
-  const navGap = lerp(32, 14, p);
-  const navFontPx = lerp(13, 10.5, p);
-  const navTrackEm = lerp(0.12, 0.16, p);
+  const navGap = lerp(18, 10, p);
+  const navFontPx = lerp(12, 10, p);
+  const navTrackEm = lerp(0.08, 0.1, p);
   const navLift = lerp(0, -3, p);
 
   /** Transición marca izquierda: blanco grande → rojo compacto (cruza con el scroll) */
@@ -240,7 +240,7 @@ export function Header() {
   const markBoxW = 200;
   const markBoxH = 50;
   /**
-   * Móvil/tablet (< lg): caja fija + escala fija para mono y rojo.
+   * Móvil/tablet (< xl): caja fija + escala fija para mono y rojo.
    * No usar `markScale` del scroll (eso anima el logo de escritorio): al mezclarlo con el crossfade
    * blanco→rojo el tamaño “respira” y el PNG rojo se ve desacomodado.
    */
@@ -273,7 +273,7 @@ export function Header() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div
-          className={cn("relative overflow-x-visible transition-none", inPreviewCanvas ? "hidden" : "hidden lg:flex lg:justify-center")}
+          className={cn("relative overflow-x-visible transition-none", inPreviewCanvas ? "hidden" : "hidden xl:flex xl:justify-center")}
           style={{ paddingTop: `${logoPadTop}px`, paddingBottom: `${logoPadBottom}px` }}
         >
           <Link
@@ -326,7 +326,7 @@ export function Header() {
         </div>
 
         <div
-          className={cn("relative overflow-visible border-t border-white/10", inPreviewCanvas ? "hidden" : "hidden lg:block")}
+          className={cn("relative overflow-hidden border-t border-white/10", inPreviewCanvas ? "hidden" : "hidden xl:block")}
           style={{ minHeight: `${navRowH}px` }}
         >
           {/* Misma franja que la marca (`left-8` + `markBoxW`): alineación por centro óptico de la V → icono X (ver constantes arriba). */}
@@ -355,11 +355,11 @@ export function Header() {
             className="absolute inset-0 z-[57] flex items-stretch"
             style={{
               transform: `translateY(${navLift}px)`,
-              paddingLeft: "clamp(9rem, 16vw, 12rem)",
-              paddingRight: "clamp(9rem, 16vw, 12rem)",
+              paddingLeft: "clamp(7.5rem, 14vw, 11rem)",
+              paddingRight: "clamp(4.5rem, 8vw, 6.5rem)",
             }}
           >
-            <div className="flex min-w-0 flex-1 items-center justify-center" style={{ gap: `${navGap}px` }}>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center py-1" style={{ gap: `${navGap}px` }}>
               {VITERRA_NAV_ITEMS.map(([to, labelKey]) => {
                 const active = isActiveNavPath(routePath, to);
                 return (
@@ -383,7 +383,8 @@ export function Header() {
                 )}
                 style={{ fontSize: `${navFontPx}px`, letterSpacing: `${navTrackEm}em` }}
               >
-                <span>FAVORITOS</span>
+                <Heart className="h-3.5 w-3.5 shrink-0" strokeWidth={1.6} aria-hidden />
+                <span>{t("nav.favorites")}</span>
                 {count > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#C8102E] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
                     {count}
@@ -397,7 +398,7 @@ export function Header() {
         <div
           className={cn(
             "relative grid min-h-[56px] grid-cols-[1fr_auto] items-center gap-2 border-t-0 px-2 py-1.5 sm:min-h-[52px] sm:grid-cols-[1fr_auto_1fr] sm:px-3",
-            inPreviewCanvas ? "" : "lg:hidden"
+            inPreviewCanvas ? "" : "xl:hidden"
           )}
         >
           <Link
@@ -460,7 +461,8 @@ export function Header() {
               </div>
             </div>
           </div>
-          <div className="relative col-start-2 z-[56] flex items-center justify-end gap-1 justify-self-end sm:col-start-3">
+          <div className="relative col-start-2 z-[56] flex items-center justify-end gap-0.5 justify-self-end sm:col-start-3">
+            <LanguageToggle />
             <Link
               to={localePath("/favoritos")}
               aria-label={`${t("nav.favorites")} (${count})`}
@@ -490,7 +492,7 @@ export function Header() {
         <nav
           className={cn(
             "max-h-[min(70vh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-5rem))] overflow-y-auto overscroll-contain border-t border-white/10",
-            inPreviewCanvas ? "block" : "lg:hidden"
+            inPreviewCanvas ? "block" : "xl:hidden"
           )}
           style={{
             backgroundColor: `rgba(${NAVY.r},${NAVY.g},${NAVY.b},${lerp(MOBILE_MENU_BG_ALPHA_TOP, BG_ALPHA_MAX, p)})`,

@@ -48,11 +48,8 @@ import { useLocale, type TranslateFn } from "../i18n/LocaleContext";
 import type { Locale } from "../i18n/locale";
 import { translateCatalogFeatures, translatePropertyType } from "../i18n/catalogTerms";
 import { resolveTelHref, formatPhoneForDisplay } from "../lib/phoneLink";
-import {
-  RICH_DESCRIPTION_HTML_CLASS,
-  resolvePublicDescription,
-  sanitizeRichHtml,
-} from "../lib/propertyDescription";
+import { resolvePublicDescription } from "../lib/propertyDescription";
+import { StructuredDescription } from "../components/StructuredDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
 import { orientationLabel } from "../lib/propertyOrientation";
 import { useWishlist } from "../contexts/WishlistContext";
@@ -726,7 +723,7 @@ export function PropertyDetailPage() {
                     transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
                   >
 
-                    {/* Descripción: solo la con formato; la breve es privada (admin). */}
+                    {/* Descripción: mismo esquema que la ficha PDF (títulos / viñetas). */}
                     {activeTab === "descripcion" && (
                       <div className="space-y-4">
                         {(() => {
@@ -734,19 +731,14 @@ export function PropertyDetailPage() {
                             description: property.description,
                             richDescription: property.richDescription,
                           });
-                          if (pub.kind === "rich") {
+                          const source = pub.kind === "rich" ? pub.html : pub.kind === "plain" ? pub.plain : "";
+                          if (source) {
                             return (
-                              <div
-                                className={cn(RICH_DESCRIPTION_HTML_CLASS, "pd-rich-desc")}
-                                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(pub.html) }}
+                              <StructuredDescription
+                                source={source}
+                                bodyColor={T.body}
+                                headerColor={T.navy}
                               />
-                            );
-                          }
-                          if (pub.kind === "plain") {
-                            return (
-                              <p className="whitespace-pre-line text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
-                                {pub.plain}
-                              </p>
                             );
                           }
                           return (

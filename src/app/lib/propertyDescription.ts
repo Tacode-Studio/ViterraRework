@@ -54,6 +54,63 @@ export function publicDescriptionPlainText(args: {
 export const RICH_DESCRIPTION_HTML_CLASS =
   "text-base leading-relaxed text-slate-700 [&_strong]:font-semibold [&_em]:italic [&_u]:underline [&_s]:line-through [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1 [&_a]:text-primary [&_a]:underline";
 
+export type DescriptionBlock =
+  | { type: "header"; text: string }
+  | { type: "bullet"; text: string }
+  | { type: "paragraph"; text: string };
+
+/**
+ * Convierte HTML o texto Tokko al mismo esquema que la ficha PDF:
+ * encabezados (línea que termina en «:» o un h2/h3) y viñetas (`*` / `<li>`).
+ */
+export function descriptionSourceToStructuredText(source: string | undefined | null): string {
+  if (!source?.trim()) return "";
+  let text = source;
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<\/div>/gi, "\n");
+  text = text.replace(/<div[^>]*>/gi, "\n");
+  text = text.replace(/<h[23][^>]*>/gi, "\n");
+  text = text.replace(/<\/h[23]>/gi, ":\n");
+  text = text.replace(/<li[^>]*>/gi, "\n* ");
+  text = text.replace(/<\/li>/gi, "");
+  text = text.replace(/<[^>]+>/g, " ");
+  text = text.replace(/&nbsp;/gi, " ");
+  text = text.replace(/&amp;/gi, "&");
+  text = text.replace(/&lt;/gi, "<");
+  text = text.replace(/&gt;/gi, ">");
+  text = text.replace(/([^\n])\s*\*/g, "$1\n*");
+  text = text.replace(
+    /(?<=[\n.!?]| )((?:Características|Amenidades|Ubicación|Servicios|Acabados|Equipamiento|Distribución|Espacios|Áreas comunes|Incluye|Features|Amenities|Location|Services)\s*:)/gi,
+    "\n$1",
+  );
+  text = text.replace(/\n\s*\n/g, "\n\n");
+  text = text.replace(/ {2,}/g, " ");
+  return text.trim();
+}
+
+export function parseStructuredDescription(source: string | undefined | null): DescriptionBlock[] {
+  const text = descriptionSourceToStructuredText(source);
+  if (!text) return [];
+
+  const blocks: DescriptionBlock[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("*") || line.startsWith("•") || line.startsWith("- ")) {
+      const item = line.replace(/^[*•-]\s*/, "").trim();
+      if (item) blocks.push({ type: "bullet", text: item });
+      continue;
+    }
+    if (line.endsWith(":")) {
+      blocks.push({ type: "header", text: line.replace(/:+$/, "").trim() });
+      continue;
+    }
+    blocks.push({ type: "paragraph", text: line });
+  }
+  return blocks;
+}
+
 /** Sanitiza HTML rico antes de renderizar con dangerouslySetInnerHTML. */
 export function sanitizeRichHtml(html: string | undefined | null): string {
   if (!html?.trim()) return "";

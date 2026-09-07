@@ -46,19 +46,6 @@ const MARK_ICON_RED = "/images/branding/viterra-mark-red-alpha.png";
 const MARK_MONO_SCALE_FACTOR = 0.88;
 
 /**
- * Centro horizontal **óptico** de la V respecto al ancho de caja del PNG (0 = borde izq., 1 = borde der.).
- * El asset es asimétrico: el centro de masa visual queda claramente a la izquierda del centro geométrico.
- * Ajustar entre ~0.15 y ~0.22 si se sustituye el PNG (sube si la V se ve aún corrida a la derecha).
- */
-const MARK_LOGO_OPTICAL_CENTER_X_RATIO = 0.21;
-
-/**
- * Distancia en px desde el borde izquierdo del `<ul>` de redes (tamaño `md`: `p-2`, icono 17px, `sm:gap-2`)
- * hasta el centro horizontal del 3.er icono. Recalcular si cambian paddings, gaps u orden en `SocialNavIcons`.
- */
-const MD_SOCIAL_UL_LEFT_TO_THIRD_ICON_CENTER_PX = 98.5;
-
-/**
  * Caja fija + scale. La imagen ocupa el 100% del ancho de la caja para que `transform-origin: bottom center`
  * coincida con el centro del layout (si el PNG es más estrecho que la caja, object-fit no desplaza el origen).
  */
@@ -248,9 +235,6 @@ export function Header() {
   const markBoxHMobile = 26;
   const MOBILE_HEADER_MARK_SCALE = 0.92 * MARK_MONO_SCALE_FACTOR;
 
-  /** Centro del 3.er icono bajo el centro óptico de la V: margen izq. del `<ul>` dentro de la caja `markBoxW`. */
-  const desktopSocialMarginLeft =
-    markBoxW * MARK_LOGO_OPTICAL_CENTER_X_RATIO - MD_SOCIAL_UL_LEFT_TO_THIRD_ICON_CENTER_PX;
   const navLinkClass =
     "font-normal uppercase text-white/85 hover:text-white transition-colors shrink-0";
   /** Modo 1 (nav centrada, inicio de scroll): subrayado blanco. Modo 2 (nav partida): rojo corporativo. */
@@ -326,17 +310,16 @@ export function Header() {
         </div>
 
         <div
-          className={cn("relative overflow-hidden border-t border-white/10", inPreviewCanvas ? "hidden" : "hidden xl:block")}
+          className={cn("relative overflow-visible border-t border-white/10", inPreviewCanvas ? "hidden" : "hidden xl:block")}
           style={{ minHeight: `${navRowH}px` }}
         >
-          {/* Misma franja que la marca (`left-8` + `markBoxW`): alineación por centro óptico de la V → icono X (ver constantes arriba). */}
+          {/* Redes a la izquierda, sin recorte: el margen negativo anterior dejaba Facebook mocha. */}
           <div className="pointer-events-none absolute inset-0 z-[59]">
             <div
-              className="pointer-events-none absolute left-8 top-0 z-[58] flex h-full items-center justify-start overflow-visible sm:left-10"
-              style={{ width: markBoxW }}
+              className="pointer-events-none absolute left-0 top-0 z-[58] flex h-full items-center justify-start overflow-visible"
             >
               <PreviewSectionChrome blockId="header-social" label="Redes del encabezado" compact hideLabel>
-                <span className="pointer-events-auto inline-flex shrink-0" style={{ marginLeft: desktopSocialMarginLeft }}>
+                <span className="pointer-events-auto inline-flex shrink-0 overflow-visible">
                   <SocialNavIcons iconSize="md" />
                 </span>
               </PreviewSectionChrome>

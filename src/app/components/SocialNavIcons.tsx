@@ -53,7 +53,7 @@ export function SocialNavIcons({ className, iconSize = "md" }: SocialNavIconsPro
       role="list"
       aria-label="Redes sociales"
       className={cn(
-        "flex flex-nowrap items-center",
+        "flex flex-nowrap items-center overflow-visible",
         iconSize === "md" ? "gap-1 sm:gap-2" : "gap-0.5 sm:gap-1.5",
         className
       )}
@@ -61,7 +61,7 @@ export function SocialNavIcons({ className, iconSize = "md" }: SocialNavIconsPro
       {linksWithIndex.map(({ link: { id, label, href }, index }) => {
         const Lucide = iconById[id] ?? LinkIcon;
         return (
-          <li key={`${id}-${index}`} className="shrink-0">
+          <li key={`${id}-${index}`} className="shrink-0 overflow-visible">
             <PreviewFieldPulse
               blockId="header-social"
               fieldKey={`header-social-${index}-href`}
@@ -74,14 +74,14 @@ export function SocialNavIcons({ className, iconSize = "md" }: SocialNavIconsPro
                 aria-label={label}
                 title={label}
                 className={cn(
-                  "inline-flex items-center justify-center rounded-md text-white/85 transition-colors",
+                  "inline-flex items-center justify-center overflow-visible rounded-md text-white/85 transition-colors",
                   "hover:bg-white/[0.07] hover:text-white",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60",
                   "active:bg-white/[0.1]",
                   pad
                 )}
               >
-                <Lucide className={icon} strokeWidth={1.5} aria-hidden />
+                <Lucide className={cn(icon, "overflow-visible")} strokeWidth={1.5} aria-hidden />
               </a>
             </PreviewFieldPulse>
           </li>

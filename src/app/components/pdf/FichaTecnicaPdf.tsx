@@ -1,7 +1,7 @@
 import React from "react";
 import { Document, Page, Text, View, Image, StyleSheet, Svg, Path, G, Rect, Circle } from "@react-pdf/renderer";
 import type { Property } from "../PropertyCard";
-import { hasRichDescription } from "../../lib/propertyDescription";
+import { descriptionSourceToStructuredText, resolvePublicDescription } from "../../lib/propertyDescription";
 import type { Development } from "../../data/developments";
 import type { User } from "../../contexts/AuthContext";
 import { loadWorkspaceAdminSettings } from "../../data/workspaceSettings";
@@ -447,20 +447,7 @@ const renderDescription = (text: string, isDarkBg: boolean) => {
 };
 
 function stripHtml(html: string | undefined): string {
-  if (!html) return "Sin descripción disponible.";
-  let text = html.replace(/<br\s*[\/]?>/gi, "\n");
-  text = text.replace(/<\/p>/gi, "\n\n");
-  text = text.replace(/<li[^>]*>/gi, "\n* ");
-  text = text.replace(/<\/li>/gi, "");
-  text = text.replace(/<div[^>]*>/gi, "\n");
-  text = text.replace(/<\/div>/gi, "");
-  text = text.replace(/<[^>]+>/g, " "); // Replace remaining tags with space to avoid word join
-  text = text.replace(/\n\s*\n/g, "\n\n");
-  text = text.replace(/&nbsp;/g, " ");
-  text = text.replace(/([^\n])\s*\*/g, "$1\n*");
-  // Clean up multiple spaces
-  text = text.replace(/ {2,}/g, " ");
-  return text.trim();
+  return descriptionSourceToStructuredText(html) || "Sin descripción disponible.";
 }
 
 export function FichaTecnicaPdf({ data, type, includeLogo, user, manualFields }: FichaTecnicaPdfProps) {
@@ -472,11 +459,11 @@ export function FichaTecnicaPdf({ data, type, includeLogo, user, manualFields }:
   const location = isDev ? (p.colony || p.location) : p.location;
   const address = p.fullAddress || location || "";
   const price = isDev ? p.priceRange : `$${p.price?.toLocaleString()}`;
-  const descriptionRaw = isDev
-    ? p.description
-    : hasRichDescription(p.richDescription)
-      ? p.richDescription!
-      : p.description;
+  const pubDesc = resolvePublicDescription({
+    description: p.description,
+    richDescription: p.richDescription,
+  });
+  const descriptionRaw = pubDesc.kind === "rich" ? pubDesc.html : pubDesc.kind === "plain" ? pubDesc.plain : "";
   const descriptionText = stripHtml(descriptionRaw);
   const image = p.image;
   const reference = p.referenceCode || (isDev ? p.tokkoId : "N/A");

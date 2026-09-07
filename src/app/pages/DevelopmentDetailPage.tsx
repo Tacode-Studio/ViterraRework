@@ -28,12 +28,8 @@ import { getViterraStreetTileLayer } from "../lib/mapTileConfig";
 import { displayDeliveryDate } from "../data/developments";
 import { previewDevelopmentReferenceCode } from "../lib/developmentReferenceCode";
 import { developmentTours3dList, developmentVideosList } from "../lib/developmentMedia";
-import {
-  publicDescriptionPlainText,
-  resolvePublicDescription,
-  RICH_DESCRIPTION_HTML_CLASS,
-  sanitizeRichHtml,
-} from "../lib/propertyDescription";
+import { publicDescriptionPlainText, resolvePublicDescription } from "../lib/propertyDescription";
+import { StructuredDescription } from "../components/StructuredDescription";
 import { IFRAME_SANDBOX_ATTR } from "../lib/safeEmbed";
 import {
   propertyTour3dDisplayTitle,
@@ -558,22 +554,15 @@ export function DevelopmentDetailPage() {
                                 description: development.description,
                                 richDescription: development.richDescription,
                               });
-                              if (pub.kind === "rich") {
-                                return (
-                                  <div
-                                    className={cn(RICH_DESCRIPTION_HTML_CLASS, "dd-rich-desc")}
-                                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(pub.html) }}
-                                  />
-                                );
-                              }
-                              if (pub.kind === "plain") {
-                                return (
-                                  <p className="text-[15px]" style={{ color: T.body, lineHeight: 1.8 }}>
-                                    {pub.plain}
-                                  </p>
-                                );
-                              }
-                              return null;
+                              const source = pub.kind === "rich" ? pub.html : pub.kind === "plain" ? pub.plain : "";
+                              if (!source) return null;
+                              return (
+                                <StructuredDescription
+                                  source={source}
+                                  bodyColor={T.body}
+                                  headerColor={T.navy}
+                                />
+                              );
                             })()}
                           </div>
                           {descriptionNeedsExpand && !descriptionExpanded ? (

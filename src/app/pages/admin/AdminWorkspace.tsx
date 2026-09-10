@@ -139,7 +139,9 @@ import {
   idFromPropertyWriteResult,
   insertProperty,
   propertyWriteMetaFromResult,
-  softDeleteProperty,
+  archiveProperty,
+  deletePropertyPermanently,
+  restoreProperty,
   updateProperty,
   updatePropertyFeatured,
   MAX_FEATURED_PROPERTIES,
@@ -149,7 +151,9 @@ import type { Development } from "../../data/developments";
 import {
   fetchDevelopmentsWithUnits,
   upsertDevelopment,
-  softDeleteDevelopment,
+  archiveDevelopment,
+  deleteDevelopmentPermanently,
+  restoreDevelopment,
 } from "../../lib/supabaseDevelopments";
 import { insertCatalogActivity } from "../../lib/supabaseCatalogActivities";
 import {
@@ -375,14 +379,28 @@ export function AdminWorkspace() {
   /** Set to true once the pipeline bootstrap has run for this session. */
   const pipelineBootstrappedRef = useRef(false);
   const {
-    properties,
+    properties: allProperties,
     loading: catalogPropertiesLoading,
     error: catalogPropertiesError,
     catalogSchemaWarning,
     reload: reloadProperties,
     patchProperty: patchCatalogProperty,
     applySavedProperty,
-  } = useCatalogProperties({ enabled: adminRemoteDataPlan.needsCatalog, omitPayload: true });
+  } = useCatalogProperties({
+    enabled: adminRemoteDataPlan.needsCatalog,
+    omitPayload: true,
+    includeArchived: true,
+  });
+  /**
+   * Las fichas dadas de baja se separan aquí para que el resto del panel (estadísticas,
+   * vinculación con desarrollos, selector de propiedad en leads) siga trabajando solo con
+   * las publicadas. La lista de bajas vive en su propio filtro del inventario. Ver docs/ADR-001.
+   */
+  const properties = useMemo(() => allProperties.filter((p) => !p.archivedAt), [allProperties]);
+  const archivedProperties = useMemo(
+    () => allProperties.filter((p) => Boolean(p.archivedAt)),
+    [allProperties],
+  );
   const [newPropertyDraftId, setNewPropertyDraftId] = useState(() => crypto.randomUUID());
   const [developments, setDevelopments] = useState<Development[]>([]);
   const [developmentsLoading, setDevelopmentsLoading] = useState(true);
@@ -405,6 +423,7 @@ export function AdminWorkspace() {
     setPropertyLocationFilter,
     propertyFeaturedFilter,
     setPropertyFeaturedFilter,
+    propertyArchivedFilter,
     propertyCatalogSort,
     setPropertyCatalogSort,
     propertyInventoryView,
@@ -1112,10 +1131,17 @@ export function AdminWorkspace() {
 
   const executeDeleteProperty = useCallback(async () => {
     if (!deletePropertyId) return;
-    const deletedSnapshot = properties.find((p) => p.id === deletePropertyId);
+    // Sobre `allProperties`: el borrado definitivo se pide sobre todo desde la lista de
+    // fichas dadas de baja, que no están en `properties`.
+    const deletedSnapshot = allProperties.find((p) => p.id === deletePropertyId);
     const client = getSupabaseClient();
     if (client) {
-      const { error: delErr } = await softDeleteProperty(client, deletePropertyId);
+      // Borrado definitivo: se lleva traducciones y archivos subidos al CRM. La baja
+      // reversible es `handleArchiveProperty`.
+      const { error: delErr } = await deletePropertyPermanently(client, {
+        ...(deletedSnapshot ?? ({} as Property)),
+        id: deletePropertyId,
+      });
       if (delErr) {
         toast.error(delErr.message);
         return;
@@ -1133,7 +1159,7 @@ export function AdminWorkspace() {
     await reloadProperties();
     setPropertyForm((f) => (f?.property?.id === deletePropertyId ? null : f));
     setDeletePropertyId(null);
-  }, [deletePropertyId, logCatalogActivity, properties, reloadProperties]);
+  }, [deletePropertyId, logCatalogActivity, allProperties, reloadProperties]);
 
   const handleDeleteLead = useCallback(
     async (id: string) => {
@@ -1163,12 +1189,59 @@ export function AdminWorkspace() {
     [isAdmin, leads]
   );
 
+  /** Da de baja un desarrollo a mano: deja de publicarse pero no se pierde nada. */
+  const handleArchiveDevelopment = useCallback(
+    async (development: Development) => {
+      const client = getSupabaseClient();
+      if (!client) {
+        toast.error("Supabase no configurado.");
+        return;
+      }
+      const { error } = await archiveDevelopment(client, development.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      const { data, error: fetchErr } = await fetchDevelopmentsWithUnits(client, {
+        publicOnly: false,
+      });
+      if (fetchErr) toast.error(fetchErr.message);
+      else setDevelopments(data ?? []);
+      toast.success("Desarrollo dado de baja: ya no se muestra en el sitio.");
+    },
+    [],
+  );
+
+  /** Reactiva un desarrollo dado de baja: vuelve a publicarse en el sitio. Ver docs/ADR-001. */
+  const handleRestoreDevelopment = useCallback(
+    async (development: Development) => {
+      const client = getSupabaseClient();
+      if (!client) {
+        toast.error("Supabase no configurado.");
+        return;
+      }
+      const { error } = await restoreDevelopment(client, development.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      const { data, error: fetchErr } = await fetchDevelopmentsWithUnits(client, {
+        publicOnly: false,
+      });
+      if (fetchErr) toast.error(fetchErr.message);
+      else setDevelopments(data ?? []);
+      toast.success("Desarrollo restaurado: vuelve a mostrarse en el sitio.");
+    },
+    [],
+  );
+
   const handleDeleteDevelopment = useCallback(
     async (id: string) => {
       const deletedDev = developments.find((d) => d.id === id);
       const client = getSupabaseClient();
       if (client) {
-        const { error } = await softDeleteDevelopment(client, id);
+        // Borrado definitivo: limpia también las traducciones del catálogo.
+        const { error } = await deleteDevelopmentPermanently(client, id);
         if (error) {
           toast.error(error.message);
           return;
@@ -2130,6 +2203,47 @@ export function AdminWorkspace() {
     [properties, reloadProperties, patchCatalogProperty, applySavedProperty]
   );
 
+  /**
+   * Da de baja una ficha a mano: deja de publicarse pero no se pierde nada. Es la
+   * alternativa reversible a "Eliminar". Ver docs/ADR-001.
+   */
+  const handleArchiveProperty = useCallback(
+    async (property: Property) => {
+      const client = getSupabaseClient();
+      if (!client) {
+        toast.error("Supabase no configurado.");
+        return;
+      }
+      const { error } = await archiveProperty(client, property.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Propiedad dada de baja: ya no se muestra en el sitio.");
+      await reloadProperties();
+    },
+    [reloadProperties],
+  );
+
+  /** Reactiva una ficha dada de baja: vuelve a publicarse en el sitio. Ver docs/ADR-001. */
+  const handleRestoreProperty = useCallback(
+    async (property: Property) => {
+      const client = getSupabaseClient();
+      if (!client) {
+        toast.error("Supabase no configurado.");
+        return;
+      }
+      const { error } = await restoreProperty(client, property.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Propiedad restaurada: vuelve a mostrarse en el sitio.");
+      await reloadProperties();
+    },
+    [reloadProperties],
+  );
+
   const openLeadDetail = useCallback(
     (lead: Lead, mode: "view" | "edit") => {
       const full = leads.find((l) => l.id === lead.id) ?? lead;
@@ -2447,7 +2561,7 @@ export function AdminWorkspace() {
 
   const propertiesMatchingInventoryFilters = useMemo(
     () =>
-      filterPropertiesForDisplay(properties, {
+      filterPropertiesForDisplay(propertyArchivedFilter === "archived" ? archivedProperties : properties, {
         propertySearchQuery,
         propertyReferenceCodeQuery,
         propertyOperationFilter,
@@ -2457,6 +2571,8 @@ export function AdminWorkspace() {
       }),
     [
       properties,
+      archivedProperties,
+      propertyArchivedFilter,
       propertySearchQuery,
       propertyReferenceCodeQuery,
       propertyOperationFilter,
@@ -3519,6 +3635,7 @@ export function AdminWorkspace() {
                 propertyTypeOptions={propertyTypeOptions}
                 propertyLocationOptions={propertyLocationOptions}
                 propertyFeaturedCount={propertyFeaturedCount}
+                archivedPropertyCount={archivedProperties.length}
                 canManageInventory={canManageInventory}
                 isAdmin={isAdmin}
                 onNew={() => {
@@ -3548,6 +3665,8 @@ export function AdminWorkspace() {
                 }}
                 handleTogglePropertyFeatured={handleTogglePropertyFeatured}
                 requestDeleteProperty={requestDeleteProperty}
+                onRestoreProperty={handleRestoreProperty}
+                onArchiveProperty={handleArchiveProperty}
                 copyPublicPageUrl={copyPublicPageUrl}
                 navigate={navigate}
                 adminModuleFallback={adminModuleFallback}
@@ -3568,6 +3687,8 @@ export function AdminWorkspace() {
               onUnlinkProperty={handleUnlinkPropertyFromDevelopment}
               onSave={handleSaveDevelopment}
               onDelete={handleDeleteDevelopment}
+              onRestore={handleRestoreDevelopment}
+              onArchive={handleArchiveDevelopment}
               onEditProperty={(property) => {
                 goTab("properties");
                 setPropertyForm({ mode: "edit", property });
@@ -3843,16 +3964,18 @@ export function AdminWorkspace() {
               </p>
               <AlertDialogHeader className="mt-2 space-y-2 text-left">
                 <AlertDialogTitle className="font-heading text-xl text-brand-navy" style={{ fontWeight: 600 }}>
-                  ¿Eliminar esta propiedad?
+                  ¿Eliminar esta propiedad definitivamente?
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-sm leading-relaxed text-slate-600" style={{ fontWeight: 500 }}>
                   {deletePropertyId ? (
                     <>
                       Vas a eliminar{" "}
                       <span className="font-semibold text-brand-navy">
-                        «{properties.find((p) => p.id === deletePropertyId)?.title ?? "esta propiedad"}»
+                        «{allProperties.find((p) => p.id === deletePropertyId)?.title ?? "esta propiedad"}»
                       </span>
-                      . Esta acción no se puede deshacer y la ficha dejará de mostrarse en el catálogo público.
+                      , junto con sus fotos subidas, videos y traducciones. No se puede deshacer.
+                      Si solo quieres que deje de mostrarse en el sitio, dala de baja: se conserva
+                      todo y puedes restaurarla.
                     </>
                   ) : (
                     "Esta acción no se puede deshacer."

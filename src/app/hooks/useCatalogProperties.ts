@@ -24,14 +24,28 @@ export type UseCatalogPropertiesOptions = {
   enabled?: boolean;
   /** Listado admin: consulta sin columna `payload` (menos transferencia). */
   omitPayload?: boolean;
+  /**
+   * Incluir las fichas dadas de baja (`archived_at`). Solo el panel: el sitio público no
+   * debe verlas ni siquiera desde la caché. Ver docs/ADR-001.
+   */
+  includeArchived?: boolean;
 };
 
 const CATALOG_STORAGE_KEY = "viterra_catalog_cache_properties";
 
-function readCachedCatalog(locale: string): Property[] {
+/**
+ * La caché del panel (que incluye fichas dadas de baja) va en una clave aparte: si
+ * compartiera clave con la del sitio, una página pública pintaría fichas archivadas
+ * desde la caché antes de que llegue su propia consulta.
+ */
+function catalogCacheKey(locale: string, includeArchived: boolean): string {
+  return `${CATALOG_STORAGE_KEY}_${locale}${includeArchived ? "_admin" : ""}`;
+}
+
+function readCachedCatalog(locale: string, includeArchived: boolean): Property[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = sessionStorage.getItem(`${CATALOG_STORAGE_KEY}_${locale}`);
+    const raw = sessionStorage.getItem(catalogCacheKey(locale, includeArchived));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -40,10 +54,10 @@ function readCachedCatalog(locale: string): Property[] {
   }
 }
 
-function writeCachedCatalog(locale: string, items: Property[]) {
+function writeCachedCatalog(locale: string, includeArchived: boolean, items: Property[]) {
   if (typeof window === "undefined" || items.length === 0) return;
   try {
-    sessionStorage.setItem(`${CATALOG_STORAGE_KEY}_${locale}`, JSON.stringify(items));
+    sessionStorage.setItem(catalogCacheKey(locale, includeArchived), JSON.stringify(items));
   } catch {
     // ignore
   }
@@ -53,8 +67,13 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
   const { locale } = useLocale();
   const enabled = opts?.enabled !== false;
   const omitPayload = Boolean(opts?.omitPayload);
-  const [properties, setProperties] = useState<Property[]>(() => readCachedCatalog(locale));
-  const [loading, setLoading] = useState(() => enabled && readCachedCatalog(locale).length === 0);
+  const includeArchived = Boolean(opts?.includeArchived);
+  const [properties, setProperties] = useState<Property[]>(() =>
+    readCachedCatalog(locale, includeArchived),
+  );
+  const [loading, setLoading] = useState(
+    () => enabled && readCachedCatalog(locale, includeArchived).length === 0,
+  );
   const [error, setError] = useState<string | null>(null);
   /** Aviso cuando el listado cargó sin columnas de medios/contacto (migración pendiente). */
   const [catalogSchemaWarning, setCatalogSchemaWarning] = useState<string | null>(null);
@@ -104,7 +123,7 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
       for (let attempt = 0; attempt < CATALOG_FETCH_ATTEMPTS; attempt++) {
         try {
           const { data, error: qErr } = await withTimeout(
-            fetchCatalogProperties(client, omitPayload ? { omitPayload: true } : undefined),
+            fetchCatalogProperties(client, { omitPayload, includeArchived }),
             FETCH_PROPERTIES_TIMEOUT_MS,
             "Catálogo"
           );
@@ -165,7 +184,7 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
         if (gen !== fetchGenerationRef.current) return;
         const translatedList = mapped.map((p) => applyPropertyTranslations(p, translations));
         setProperties(translatedList);
-        writeCachedCatalog(locale, translatedList);
+        writeCachedCatalog(locale, includeArchived, translatedList);
         lastFetchedAtRef.current = Date.now();
         if (import.meta.env.DEV && list.length === 0) {
           void logTableCountHints(client, "properties");
@@ -176,7 +195,7 @@ export function useCatalogProperties(opts?: UseCatalogPropertiesOptions) {
         setLoading(false);
       }
     }
-  }, [omitPayload, locale]);
+  }, [omitPayload, includeArchived, locale]);
 
   useEffect(() => {
     if (!enabled) {

@@ -17,6 +17,12 @@ export type PropertiesFiltersState = {
   /** Todas / solo destacadas (portada) / sin destacar. */
   propertyFeaturedFilter: "all" | "featured" | "normal";
   setPropertyFeaturedFilter: Setter<"all" | "featured" | "normal">;
+  /**
+   * Qué lista se muestra: las publicadas o las dadas de baja (`archived_at`).
+   * Son conjuntos disjuntos, no un filtro más: ver docs/ADR-001.
+   */
+  propertyArchivedFilter: "active" | "archived";
+  setPropertyArchivedFilter: Setter<"active" | "archived">;
   propertyCatalogSort: CatalogPropertySortKey;
   setPropertyCatalogSort: Setter<CatalogPropertySortKey>;
   propertyInventoryView: "cards" | "list" | "map";
@@ -34,6 +40,7 @@ export function usePropertiesFilters(): PropertiesFiltersState {
   const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
   const [propertyLocationFilter, setPropertyLocationFilter] = useState("all");
   const [propertyFeaturedFilter, setPropertyFeaturedFilter] = useState<"all" | "featured" | "normal">("all");
+  const [propertyArchivedFilter, setPropertyArchivedFilter] = useState<"active" | "archived">("active");
   const [propertyCatalogSort, setPropertyCatalogSort] = useState<CatalogPropertySortKey>("newest");
   const [propertyInventoryView, setPropertyInventoryView] = useState<"cards" | "list" | "map">("cards");
 
@@ -50,6 +57,8 @@ export function usePropertiesFilters(): PropertiesFiltersState {
     setPropertyLocationFilter,
     propertyFeaturedFilter,
     setPropertyFeaturedFilter,
+    propertyArchivedFilter,
+    setPropertyArchivedFilter,
     propertyCatalogSort,
     setPropertyCatalogSort,
     propertyInventoryView,

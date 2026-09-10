@@ -4,10 +4,12 @@ import {
   Bed,
   Edit,
   Eye,
+  EyeOff,
   Home,
   Link2,
   MapPin,
   Plus,
+  RotateCcw,
   Square,
   Star,
   Trash2,
@@ -32,10 +34,33 @@ type Props = {
   onNew: () => void;
   handleTogglePropertyFeatured: (property: Property) => void | Promise<void>;
   requestDeleteProperty: (id: string) => void;
+  /** Reactiva una ficha dada de baja (`archived_at`) para que vuelva al sitio. */
+  onRestoreProperty: (property: Property) => void | Promise<void>;
+  /** Da de baja una ficha a mano: deja de publicarse, sin borrar nada. */
+  onArchiveProperty: (property: Property) => void | Promise<void>;
   copyPublicPageUrl: (path: string) => void;
   navigate: (path: string) => void;
   adminModuleFallback: (className?: string) => ReactNode;
 };
+
+/** Distintivo de ficha dada de baja: no se publica en el sitio. Ver docs/ADR-001. */
+function ArchivedBadge({ property, className = "" }: { property: Property; className?: string }) {
+  const reason =
+    property.archivedReason === "manual"
+      ? "Baja hecha desde el panel"
+      : "Ya no está en Tokko Broker";
+  const since = property.archivedAt
+    ? new Date(property.archivedAt).toLocaleDateString("es-MX")
+    : null;
+  return (
+    <span
+      className={`inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-800 ring-1 ring-amber-200/80 ${className}`}
+      title={since ? `${reason} · desde el ${since}` : reason}
+    >
+      Dada de baja
+    </span>
+  );
+}
 
 /** Vistas de la pestana Propiedades: mapa, tarjetas, lista y estado vacio. */
 export function AdminPropertiesViews({
@@ -47,6 +72,8 @@ export function AdminPropertiesViews({
   onNew,
   handleTogglePropertyFeatured,
   requestDeleteProperty,
+  onRestoreProperty,
+  onArchiveProperty,
   copyPublicPageUrl,
   navigate,
   adminModuleFallback,
@@ -131,6 +158,7 @@ export function AdminPropertiesViews({
                           {property.type}
                         </span>
                         <h3 className="mb-2 text-lg font-medium leading-tight text-slate-900">{property.title}</h3>
+                        {property.archivedAt && <ArchivedBadge property={property} className="mb-2" />}
                         <p className="mb-5 flex items-center gap-1.5 text-sm text-slate-500">
                           <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} />
                           {property.location}
@@ -205,11 +233,31 @@ export function AdminPropertiesViews({
                                 >
                                   <Edit className="h-4 w-4" strokeWidth={1.5} />
                                 </button>
+                                {!property.archivedAt && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void onArchiveProperty(property)}
+                                    className="rounded p-2 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                                    title="Dar de baja: deja de mostrarse en el sitio, sin borrarla"
+                                  >
+                                    <EyeOff className="h-4 w-4" strokeWidth={1.5} />
+                                  </button>
+                                )}
+                                {property.archivedAt && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void onRestoreProperty(property)}
+                                    className="rounded p-2 text-slate-400 transition-colors hover:bg-green-50 hover:text-green-700"
+                                    title="Restaurar: vuelve a publicarse en el sitio"
+                                  >
+                                    <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => requestDeleteProperty(property.id)}
                                   className="rounded p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                  title="Eliminar"
+                                  title={property.archivedAt ? "Eliminar definitivamente" : "Eliminar"}
                                 >
                                   <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                                 </button>
@@ -309,6 +357,7 @@ export function AdminPropertiesViews({
                               >
                                 {propertyStatusLabel(property.status)}
                               </span>
+                              {property.archivedAt && <ArchivedBadge property={property} className="mt-1" />}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-right sm:px-6 sm:py-4">
                               <div className="text-right">
@@ -376,11 +425,31 @@ export function AdminPropertiesViews({
                                     >
                                       <Edit className="h-4 w-4" strokeWidth={1.5} />
                                     </button>
+                                    {!property.archivedAt && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void onArchiveProperty(property)}
+                                        className="rounded-lg p-2 text-slate-400 transition-all hover:bg-amber-50 hover:text-amber-700"
+                                        title="Dar de baja: deja de mostrarse en el sitio, sin borrarla"
+                                      >
+                                        <EyeOff className="h-4 w-4" strokeWidth={1.5} />
+                                      </button>
+                                    )}
+                                    {property.archivedAt && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void onRestoreProperty(property)}
+                                        className="rounded-lg p-2 text-slate-400 transition-all hover:bg-green-50 hover:text-green-700"
+                                        title="Restaurar: vuelve a publicarse en el sitio"
+                                      >
+                                        <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => requestDeleteProperty(property.id)}
                                       className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-600"
-                                      title="Eliminar"
+                                      title={property.archivedAt ? "Eliminar definitivamente" : "Eliminar"}
                                     >
                                       <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                                     </button>

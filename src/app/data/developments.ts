@@ -44,6 +44,13 @@ export interface Development {
   };
   featured?: boolean;
   displayOnWeb?: boolean;
+  /**
+   * Fecha de baja (`developments.archived_at`): sigue en el CRM pero no se publica.
+   * Solo llega en las consultas del panel; el sitio filtra estas fichas. Ver docs/ADR-001.
+   */
+  archivedAt?: string;
+  /** Por qué se dio de baja: ausente en la última importación de Tokko, o baja manual. */
+  archivedReason?: "missing_in_tokko" | "manual";
   inChargePhone?: string;
   inChargeWhatsapp?: string;
   inChargeName?: string;

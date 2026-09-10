@@ -117,12 +117,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // Sin filtro por `deleted_at` a propósito: en los datos sincronizados desde
     // Tokko ese campo a veces nunca queda en NULL, y las fichas correspondientes
     // sí se muestran en el sitio (ver comentario en src/app/lib/supabaseProperties.ts).
-    const { data, error } = await sb
-      .from(TABLE_BY_KIND[kind])
-      .select("id")
-      .eq("tokko_id", tokkoId)
-      .limit(1)
-      .maybeSingle();
+    //
+    // Sí se excluyen las dadas de baja (`archived_at`, docs/ADR-001): la ficha ya no
+    // existe para el visitante, así que el enlace viejo va al listado con 302. Si la
+    // columna todavía no existe en la base, se reintenta sin ese filtro.
+    const lookup = (filterArchived: boolean) => {
+      const q = sb.from(TABLE_BY_KIND[kind]).select("id").eq("tokko_id", tokkoId);
+      return (filterArchived ? q.is("archived_at", null) : q).limit(1).maybeSingle();
+    };
+
+    let { data, error } = await lookup(true);
+    if (error) ({ data, error } = await lookup(false));
 
     if (error || !data?.id) {
       redirect(res, 302, fallback);

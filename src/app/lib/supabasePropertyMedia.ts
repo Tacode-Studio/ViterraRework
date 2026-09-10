@@ -148,6 +148,16 @@ export async function deletePropertyMediaObject(client: SupabaseClient, storageP
   await client.storage.from(PROPERTY_MEDIA_BUCKET_ID).remove([path]);
 }
 
+/** Varios archivos de una vez (borrado definitivo de una ficha). Ignora rutas vacías. */
+export async function deletePropertyMediaObjects(
+  client: SupabaseClient,
+  storagePaths: string[],
+): Promise<void> {
+  const paths = storagePaths.map((p) => p.trim()).filter(Boolean);
+  if (paths.length === 0) return;
+  await client.storage.from(PROPERTY_MEDIA_BUCKET_ID).remove(paths);
+}
+
 /** Normaliza WhatsApp a solo dígitos (opcional prefijo país). */
 export function normalizeWhatsappDigits(raw: string): string {
   return raw.replace(/\D/g, "");

@@ -6,6 +6,7 @@ import {
   developmentVideosFromRow,
 } from "./developmentMedia";
 import { resolveDevelopmentReferenceCode } from "./developmentReferenceCode";
+import { withArchivedFilterFallback } from "./supabaseProperties";
 import { normalizeWhatsappLinkForStorage } from "./whatsappLink";
 
 const nowIso = () => new Date().toISOString();
@@ -46,6 +47,9 @@ type DevelopmentRow = Record<string, unknown> & {
   updated_at: string;
   deleted_at: string | null;
   display_on_web: boolean;
+  /** Baja reversible: si no es null, el desarrollo no se publica. Requiere migración `20260910120000`. */
+  archived_at?: string | null;
+  archived_reason?: string | null;
   in_charge_name?: string | null;
   in_charge_phone?: string | null;
   in_charge_email?: string | null;
@@ -114,7 +118,15 @@ export type LinkedPropertyStats = {
 async function fetchLinkedPropertyStatsByTokko(
   client: SupabaseClient
 ): Promise<Map<string, LinkedPropertyStats>> {
-  const res = await client.from("properties").select("development_tokko_id, price");
+  // Las propiedades dadas de baja no cuentan para el conteo ni el rango de precios.
+  let res = await client
+    .from("properties")
+    .select("development_tokko_id, price")
+    .is("archived_at", null);
+  if (res.error) {
+    // `archived_at` puede faltar si la migración 20260910120000 no está aplicada.
+    res = await client.from("properties").select("development_tokko_id, price");
+  }
   const m = new Map<string, LinkedPropertyStats>();
   if (res.error) return m;
   for (const raw of res.data ?? []) {
@@ -221,6 +233,11 @@ export function rowToDevelopment(
     },
     featured: row.featured,
     displayOnWeb: row.display_on_web ?? true,
+    archivedAt: row.archived_at?.trim() || undefined,
+    archivedReason:
+      row.archived_reason === "missing_in_tokko" || row.archived_reason === "manual"
+        ? row.archived_reason
+        : undefined,
     inChargeName: row.in_charge_name?.trim() || undefined,
     inChargePhone: row.in_charge_phone?.trim() ?? "",
     inChargeWhatsapp: row.in_charge_whatsapp?.trim() || undefined,
@@ -240,11 +257,16 @@ export async function fetchDevelopmentsWithUnits(
   client: SupabaseClient,
   opts: { publicOnly?: boolean } = {}
 ) {
-  let q = client.from("developments").select("*");
-  if (opts.publicOnly) {
-    q = q.eq("display_on_web", true);
-  }
-  const devRes = await q.order("name");
+  // Visibilidad del sitio: `display_on_web` es la decisión editorial del panel y
+  // `archived_at` la baja que puso la importación de Tokko (docs/ADR-001). Hacen falta las dos.
+  const devRes = await withArchivedFilterFallback((filterArchived) => {
+    let q = client.from("developments").select("*");
+    if (opts.publicOnly) {
+      q = q.eq("display_on_web", true);
+      if (filterArchived) q = q.is("archived_at", null);
+    }
+    return q.order("name");
+  }, Boolean(opts.publicOnly));
   if (devRes.error) return { data: [] as Development[], error: devRes.error };
   const rows = (devRes.data ?? []) as DevelopmentRow[];
   if (rows.length === 0) return { data: [] as Development[], error: null };
@@ -278,14 +300,17 @@ export async function fetchDevelopmentsPage(client: SupabaseClient, opts: FetchD
   const linkedByTokko =
     opts.linkedByTokko ?? (await fetchLinkedPropertyStatsByTokko(client));
 
-  let q = client.from("developments").select("*");
-  if (opts.publicOnly) {
-    q = q.eq("display_on_web", true);
-  }
-  const devRes = await q
-    .order("featured", { ascending: false })
-    .order("name")
-    .range(opts.offset, opts.offset + opts.limit - 1);
+  const devRes = await withArchivedFilterFallback((filterArchived) => {
+    let q = client.from("developments").select("*");
+    if (opts.publicOnly) {
+      q = q.eq("display_on_web", true);
+      if (filterArchived) q = q.is("archived_at", null);
+    }
+    return q
+      .order("featured", { ascending: false })
+      .order("name")
+      .range(opts.offset, opts.offset + opts.limit - 1);
+  }, Boolean(opts.publicOnly));
 
   if (devRes.error) {
     return {
@@ -325,9 +350,14 @@ export async function fetchDevelopmentByTokkoId(
   const id = String(tokkoId).trim();
   if (!id) return { data: null as Development | null, error: null };
 
-  let q = client.from("developments").select("*").eq("tokko_id", id);
-  if (opts.publicOnly) q = q.eq("display_on_web", true);
-  const devRes = await q.maybeSingle();
+  const devRes = await withArchivedFilterFallback((filterArchived) => {
+    let q = client.from("developments").select("*").eq("tokko_id", id);
+    if (opts.publicOnly) {
+      q = q.eq("display_on_web", true);
+      if (filterArchived) q = q.is("archived_at", null);
+    }
+    return q.maybeSingle();
+  }, Boolean(opts.publicOnly));
   if (devRes.error) return { data: null, error: devRes.error };
   const row = devRes.data as DevelopmentRow | null;
   if (!row) return { data: null, error: null };
@@ -347,9 +377,14 @@ export async function fetchDevelopmentById(
   id: string,
   opts: { publicOnly?: boolean } = {}
 ) {
-  let q = client.from("developments").select("*").eq("id", id);
-  if (opts.publicOnly) q = q.eq("display_on_web", true);
-  const devRes = await q.maybeSingle();
+  const devRes = await withArchivedFilterFallback((filterArchived) => {
+    let q = client.from("developments").select("*").eq("id", id);
+    if (opts.publicOnly) {
+      q = q.eq("display_on_web", true);
+      if (filterArchived) q = q.is("archived_at", null);
+    }
+    return q.maybeSingle();
+  }, Boolean(opts.publicOnly));
   if (devRes.error) return { data: null, error: devRes.error };
   const row = devRes.data as DevelopmentRow | null;
   if (!row) return { data: null, error: null };
@@ -468,6 +503,42 @@ export async function upsertDevelopment(client: SupabaseClient, d: Development) 
   return { error: null };
 }
 
-export async function softDeleteDevelopment(client: SupabaseClient, id: string) {
-  return client.from("developments").delete().eq("id", id);
+/**
+ * Da de baja un desarrollo a mano: deja de publicarse pero sigue completo en el CRM.
+ * `archived_reason = 'manual'` lo protege del desarchivado automático de la importación.
+ * Ver docs/ADR-001.
+ */
+export async function archiveDevelopment(client: SupabaseClient, id: string) {
+  const ts = nowIso();
+  return client
+    .from("developments")
+    .update({ archived_at: ts, archived_reason: "manual", updated_at: ts })
+    .eq("id", id);
 }
+
+/** Reactiva un desarrollo dado de baja: vuelve a publicarse en el sitio. */
+export async function restoreDevelopment(client: SupabaseClient, id: string) {
+  return client
+    .from("developments")
+    .update({ archived_at: null, archived_reason: null, updated_at: nowIso() })
+    .eq("id", id);
+}
+
+/**
+ * Borra el desarrollo para siempre. `development_units` cascadea por FK, pero las
+ * traducciones no: `catalog_translations` guarda `entity_id` suelto y hay que limpiarlas.
+ *
+ * Irreversible. Para quitarlo del sitio conservándolo todo está `archiveDevelopment`.
+ */
+export async function deleteDevelopmentPermanently(client: SupabaseClient, id: string) {
+  const res = await client.from("developments").delete().eq("id", id);
+  if (res.error) return res;
+  await client
+    .from("catalog_translations")
+    .delete()
+    .eq("entity", "development")
+    .eq("entity_id", id);
+  return res;
+}
+
+

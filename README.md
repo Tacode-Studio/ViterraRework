@@ -48,6 +48,28 @@ supabase functions deploy tokko-sync
 supabase functions deploy instagram-feed
 ```
 
+### Baja de fichas que ya no están en Tokko
+
+Los botones "Importar de Tokko" del panel pueden dar de baja las propiedades y desarrollos
+que el cliente eliminó en Tokko Broker, para que dejen de mostrarse en el sitio.
+
+La baja **archiva** (`archived_at`), no borra: la ficha desaparece del sitio pero conserva
+en el CRM su video, tour 3D, contacto y traducciones, y se restaura desde el filtro
+"Dadas de baja" del inventario. Si vuelve a aparecer en Tokko, se reactiva sola en la
+siguiente importación.
+
+Cada ficha se puede dar de baja y restaurar también a mano desde el inventario, sin pasar
+por la importación.
+
+El flujo de la importación es de dos pasos: el primer clic corre en seco y muestra la lista
+de fichas ausentes; solo al confirmar se aplica. La función se niega a archivar si la importación
+terminó con errores o si Tokko no devolvió el catálogo completo, y pide una segunda
+confirmación si la baja supera el 20 % del catálogo.
+
+Requiere la migración `20260910120000_catalog_archived_at.sql` aplicada **antes** de
+desplegar `tokko-sync`. Diseño y alternativas descartadas en
+[docs/ADR-001](docs/ADR-001-baja-propiedades-desarrollos-tokko.md).
+
 ### Checklist pre-producción
 
 Antes de publicar, revisa [docs/RLS-CHECKLIST.md](docs/RLS-CHECKLIST.md) y verifica:

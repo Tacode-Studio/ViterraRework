@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Property } from "../components/PropertyCard";
 import { normalizeWhatsappLinkForStorage } from "./whatsappLink";
+import { deletePropertyMediaObjects } from "./supabasePropertyMedia";
 import {
   allocateUniquePropertyTokkoId,
   VITERRA_TOKKO_ID_MAX,
@@ -106,6 +107,9 @@ export type PropertyRow = {
   lng: number | null;
   images: string[];
   deleted_at: string | null;
+  /** Baja reversible: si no es null, la ficha no se publica. Requiere migración `20260910120000`. */
+  archived_at?: string | null;
+  archived_reason?: string | null;
   synced_at?: string | null;
   updated_at?: string | null;
   featured: boolean;
@@ -233,7 +237,14 @@ export function rowToProperty(row: PropertyRow): Property {
     halfBathrooms: row.half_bathrooms != null ? nonNegInt(row.half_bathrooms) : undefined,
     creditEligible: row.credit_eligible ?? undefined,
     tags: textArrayCol(row.tags),
+    archivedAt: row.archived_at?.trim() || undefined,
+    archivedReason: archivedReasonFromRow(row.archived_reason),
   };
+}
+
+/** Normaliza `archived_reason` a los dos valores que acepta el check de la BD. */
+function archivedReasonFromRow(value: unknown): Property["archivedReason"] {
+  return value === "missing_in_tokko" || value === "manual" ? value : undefined;
 }
 
 function isViterraAdminTokkoId(tokkoId: string): boolean {
@@ -372,6 +383,11 @@ const ADMIN_CATALOG_PROPERTY_COLUMNS_MEDIA =
 
 const ADMIN_CATALOG_PROPERTY_COLUMNS = `${ADMIN_CATALOG_PROPERTY_COLUMNS_CORE},${ADMIN_CATALOG_PROPERTY_COLUMNS_MEDIA}`;
 
+/** Requiere migración `20260910120000_catalog_archived_at.sql`. */
+const ADMIN_CATALOG_PROPERTY_COLUMNS_ARCHIVE = "archived_at,archived_reason";
+
+const ADMIN_CATALOG_PROPERTY_COLUMNS_FULL = `${ADMIN_CATALOG_PROPERTY_COLUMNS},${ADMIN_CATALOG_PROPERTY_COLUMNS_ARCHIVE}`;
+
 type WriteError = { message?: string; code?: string } | null;
 
 function isMissingColumnError(err: WriteError): boolean {
@@ -425,27 +441,70 @@ export async function writeWithMissingColumnFallback<R extends { error: WriteErr
 export type FetchCatalogPropertiesOpts = {
   /** Admin inventario: menos datos por fila (sin columna `payload`). */
   omitPayload?: boolean;
+  /**
+   * Incluir las fichas dadas de baja (`archived_at`). Solo el panel las pide: el sitio
+   * público nunca debe mostrarlas. Ver docs/ADR-001.
+   */
+  includeArchived?: boolean;
 };
+
+/**
+ * Aplica el filtro de visibilidad y, si `archived_at` todavía no existe en la BD (migración
+ * `20260910120000` sin aplicar), reintenta sin él: es preferible mostrar de más a dejar el
+ * catálogo en blanco. Compartido con `supabaseDevelopments`.
+ */
+export async function withArchivedFilterFallback<R extends { error: WriteError }>(
+  run: (filterArchived: boolean) => PromiseLike<R>,
+  filterArchived: boolean,
+): Promise<R> {
+  const res = await run(filterArchived);
+  if (filterArchived && res.error && isMissingColumnError(res.error)) {
+    return await run(false);
+  }
+  return res;
+}
 
 export async function fetchCatalogProperties(
   client: SupabaseClient,
   opts?: FetchCatalogPropertiesOpts
 ) {
-  /** No filtramos por `deleted_at IS NULL`: en datos sincronizados desde Tokko a veces nunca queda NULL y el listado quedaría vacío. El borrado en admin sigue usando `softDeleteProperty`. */
+  /**
+   * `archived_at IS NULL` es el filtro de visibilidad del sitio (ver docs/ADR-001).
+   * `deleted_at` no sirve para eso: en datos sincronizados desde Tokko a veces nunca queda
+   * NULL y el listado quedaría vacío.
+   */
+  const filterArchived = !opts?.includeArchived;
+
   if (!opts?.omitPayload) {
-    return client.from("properties").select("*").order("updated_at", { ascending: false });
+    return withArchivedFilterFallback((withFilter) => {
+      let q = client.from("properties").select("*");
+      if (withFilter) q = q.is("archived_at", null);
+      return q.order("updated_at", { ascending: false });
+    }, filterArchived);
   }
 
-  const q = () =>
-    client.from("properties").select(ADMIN_CATALOG_PROPERTY_COLUMNS).order("updated_at", { ascending: false });
+  // Escalones de columnas, del ideal al mínimo: se baja uno solo ante un error de columna
+  // inexistente (migración sin aplicar en ese entorno).
+  const columnSets = [
+    ADMIN_CATALOG_PROPERTY_COLUMNS_FULL,
+    ADMIN_CATALOG_PROPERTY_COLUMNS,
+    ADMIN_CATALOG_PROPERTY_COLUMNS_CORE,
+  ];
 
-  const res = await q();
-  if (res.error && isMissingColumnError(res.error)) {
-    return client
+  let res = await withArchivedFilterFallback((withFilter) => {
+    let q = client.from("properties").select(columnSets[0]);
+    if (withFilter) q = q.is("archived_at", null);
+    return q.order("updated_at", { ascending: false });
+  }, filterArchived);
+
+  for (let i = 1; i < columnSets.length && res.error && isMissingColumnError(res.error); i++) {
+    // Sin la columna `archived_at` tampoco se puede filtrar por ella.
+    res = await client
       .from("properties")
-      .select(ADMIN_CATALOG_PROPERTY_COLUMNS_CORE)
+      .select(columnSets[i])
       .order("updated_at", { ascending: false });
   }
+
   return res;
 }
 
@@ -454,12 +513,11 @@ export async function fetchCatalogProperties(
  * Índice recomendado en Postgres: `(featured) WHERE featured = true` o partial index en `featured`.
  */
 export async function fetchFeaturedPropertiesForHome(client: SupabaseClient) {
-  return await client
-    .from("properties")
-    .select("*")
-    .eq("featured", true)
-    .order("updated_at", { ascending: false })
-    .limit(MAX_FEATURED_PROPERTIES);
+  return await withArchivedFilterFallback((withFilter) => {
+    let q = client.from("properties").select("*").eq("featured", true);
+    if (withFilter) q = q.is("archived_at", null);
+    return q.order("updated_at", { ascending: false }).limit(MAX_FEATURED_PROPERTIES);
+  }, true);
 }
 
 /** Propiedades vinculadas a un desarrollo por `development_tokko_id` (Tokko). */
@@ -469,11 +527,11 @@ export async function fetchPropertiesByDevelopmentTokkoId(client: SupabaseClient
     return { data: [] as Property[], error: null };
   }
   /** `ilike` sin comodines equivale a igualdad sin distinguir mayúsculas (alineado con el conteo por tokko en desarrollos). */
-  const res = await client
-    .from("properties")
-    .select("*")
-    .ilike("development_tokko_id", id)
-    .order("updated_at", { ascending: false });
+  const res = await withArchivedFilterFallback((withFilter) => {
+    let q = client.from("properties").select("*").ilike("development_tokko_id", id);
+    if (withFilter) q = q.is("archived_at", null);
+    return q.order("updated_at", { ascending: false });
+  }, true);
   if (res.error) return { data: null, error: res.error };
   const rows = (res.data ?? []) as PropertyRow[];
   return { data: rows.map(rowToProperty), error: null };
@@ -521,6 +579,54 @@ export async function updatePropertyFeatured(client: SupabaseClient, id: string,
   return client.from("properties").update({ featured, updated_at: ts, synced_at: ts }).eq("id", id);
 }
 
-export async function softDeleteProperty(client: SupabaseClient, id: string) {
-  return client.from("properties").delete().eq("id", id);
+/**
+ * Da de baja una ficha a mano: deja de publicarse pero sigue completa en el CRM.
+ * `archived_reason = 'manual'` la protege del desarchivado automático de la importación,
+ * que solo reactiva lo que archivó ella misma por ausencia. Ver docs/ADR-001.
+ */
+export async function archiveProperty(client: SupabaseClient, id: string) {
+  const ts = nowIso();
+  return client
+    .from("properties")
+    .update({ archived_at: ts, archived_reason: "manual", updated_at: ts })
+    .eq("id", id);
+}
+
+/** Reactiva una ficha dada de baja: vuelve a publicarse en el sitio. */
+export async function restoreProperty(client: SupabaseClient, id: string) {
+  return client
+    .from("properties")
+    .update({ archived_at: null, archived_reason: null, updated_at: nowIso() })
+    .eq("id", id);
+}
+
+/** Rutas del bucket `property-media` que solo usa esta ficha (videos subidos al CRM). */
+function propertyStoragePaths(property: Property): string[] {
+  const paths = (property.videos ?? [])
+    .filter((v) => v.kind === "storage" && v.storagePath)
+    .map((v) => v.storagePath as string);
+  if (property.videoStoragePath) paths.push(property.videoStoragePath);
+  return Array.from(new Set(paths));
+}
+
+/**
+ * Borra la ficha para siempre, junto con lo que cuelga de ella sin FK que lo arrastre:
+ * las traducciones del catálogo (`catalog_translations` guarda `entity_id` suelto) y los
+ * archivos subidos al CRM. `property_tag_links` sí cascadea por FK.
+ *
+ * Irreversible. Para quitarla del sitio conservándolo todo está `archiveProperty`.
+ */
+export async function deletePropertyPermanently(client: SupabaseClient, property: Property) {
+  const res = await client.from("properties").delete().eq("id", property.id);
+  if (res.error) return res;
+
+  // Después del DELETE: si la fila no se pudo borrar, los medios siguen haciendo falta.
+  await client
+    .from("catalog_translations")
+    .delete()
+    .eq("entity", "property")
+    .eq("entity_id", property.id);
+  await deletePropertyMediaObjects(client, propertyStoragePaths(property));
+
+  return res;
 }

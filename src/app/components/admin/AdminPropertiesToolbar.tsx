@@ -8,6 +8,8 @@ type Props = {
   propertyTypeOptions: string[];
   propertyLocationOptions: string[];
   propertyFeaturedCount: number;
+  /** Cuántas fichas están dadas de baja (`archived_at`): se muestran en su propia vista. */
+  archivedPropertyCount: number;
   canManageInventory: boolean;
   /** El botón "Importar de Tokko" solo se muestra a role='admin' (independiente de canManageInventory). */
   isAdmin: boolean;
@@ -21,6 +23,7 @@ export function AdminPropertiesToolbar({
   propertyTypeOptions,
   propertyLocationOptions,
   propertyFeaturedCount,
+  archivedPropertyCount,
   canManageInventory,
   isAdmin,
   onNew,
@@ -35,6 +38,8 @@ export function AdminPropertiesToolbar({
     setPropertyReferenceCodeQuery,
     propertyFeaturedFilter,
     setPropertyFeaturedFilter,
+    propertyArchivedFilter,
+    setPropertyArchivedFilter,
     propertyOperationFilter,
     setPropertyOperationFilter,
     propertyTypeFilter,
@@ -164,6 +169,25 @@ export function AdminPropertiesToolbar({
                       <Filter className="h-3.5 w-3.5" strokeWidth={2} />
                       Filtros
                     </span>
+
+                    <div className="relative shrink-0">
+                      <select
+                        value={propertyArchivedFilter}
+                        onChange={(e) =>
+                          setPropertyArchivedFilter(e.target.value as "active" | "archived")
+                        }
+                        className="appearance-none border-none bg-transparent py-1 pl-2 pr-7 text-sm font-medium text-slate-600 hover:text-slate-900 focus:ring-0 cursor-pointer"
+                        aria-label="Ver propiedades publicadas o dadas de baja"
+                      >
+                        <option value="active">Publicadas</option>
+                        <option value="archived">
+                          Dadas de baja{archivedPropertyCount > 0 ? ` (${archivedPropertyCount})` : ""}
+                        </option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" strokeWidth={2} />
+                    </div>
+
+                    <div className="h-5 w-px bg-slate-300 shrink-0" />
 
                     <div className="relative shrink-0">
                       <select

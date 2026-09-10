@@ -156,6 +156,13 @@ export interface Property {
   creditEligible?: boolean;
   /** `properties.tags` (etiquetas Tokko, distinto de amenities). */
   tags?: string[];
+  /**
+   * Fecha de baja (`properties.archived_at`): la ficha existe en el CRM pero no se publica.
+   * Solo llega en las consultas del panel; el sitio filtra estas fichas. Ver docs/ADR-001.
+   */
+  archivedAt?: string;
+  /** Por qué se dio de baja: ausente en la última importación de Tokko, o baja manual. */
+  archivedReason?: "missing_in_tokko" | "manual";
 }
 
 /** Lista de videos normalizada (incluye legacy de una sola columna). */

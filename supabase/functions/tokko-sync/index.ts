@@ -16,12 +16,25 @@
  *
  * Modos de "properties" desde el panel (body.propertiesMode): "new_only" solo inserta
  * tokko_id nuevos, "update_only" solo actualiza existentes con lo que traiga Tokko,
- * "sync_all" hace ambas. Ninguno borra propiedades obsoletas — eso queda reservado al
- * modo completo (cron/curl sin propertiesMode ni insertOnlyNew).
- * "developments" usa el mismo contrato vía body.developmentsMode (ver
+ * "sync_all" hace ambas. "developments" usa el mismo contrato vía body.developmentsMode (ver
  * src/app/components/admin/DevelopmentImportDialog.tsx). Leads del panel:
  * `insertOnlyNew: true` con resources "contact"/"web_contact" (dedupe `lead_kind,tokko_id`),
  * solo inserta nuevos.
+ *
+ * Baja de fichas ausentes en Tokko (`body.pruneMissing`, combinable con cualquier modo; ver
+ * docs/ADR-001): archiva —nunca borra— las propiedades/desarrollos del CRM cuyo tokko_id no
+ * vino en la respuesta de Tokko, marcando `archived_at` para que dejen de publicarse en el
+ * sitio. Con `dryRun: true` solo devuelve `summary.<recurso>.prune.candidates` sin escribir:
+ * es la vista previa que el panel muestra antes de confirmar. Lo que vuelve a aparecer en
+ * Tokko se desarchiva solo (únicamente si se archivó por ausencia, no si fue baja manual).
+ *
+ * Guardias antes de archivar (`summary.<recurso>.prune.blocked`):
+ * - "sync_errors": la importación terminó con errores.
+ * - "incomplete_fetch": Tokko no entregó el catálogo completo (paginación truncada o
+ *   `total_count` sin cubrir). Lo que falta no son bajas.
+ * - "threshold_exceeded": la baja se llevaría más del 20 % del catálogo activo. Solo este
+ *   se levanta con `body.forcePrune: true`, tras confirmación explícita del usuario.
+ * Además nunca se tocan las fichas creadas a mano en el CRM (ver isManualTokkoId).
  *
  * Optional env:
  * - TOKKO_API_BASE_URL     — default https://api.tokkobroker.com/api/v1 (API directa; `www` pasa por Cloudflare y suele dar 403 “Just a moment…” desde Edge/datacenter)
@@ -58,6 +71,13 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  pruneBlockReason,
+  selectPruneCandidates,
+  PRUNE_SAMPLE_MAX,
+  type PruneBlockReason,
+  type PruneCandidate,
+} from "./prune.ts";
 
 type ResourceKey =
   | "properties"
@@ -197,11 +217,27 @@ async function fetchTokkoPage(pathSegment: string, extra: Record<string, string>
   }
 }
 
+/** Resultado de una paginación, con el dato de si Tokko llegó a entregar el dataset entero. */
+type TokkoFetchResult = {
+  items: Record<string, unknown>[];
+  /**
+   * `true` solo si la paginación terminó de forma natural: respuesta vacía, última página
+   * corta o `total_count` alcanzado. `false` si se agotó el tope de páginas/lotes o si Tokko
+   * declaró más registros de los recibidos.
+   *
+   * Es el guardia principal de `pruneMissing`: si faltan páginas, las fichas que no llegaron
+   * parecen "eliminadas en Tokko" y archivarlas se llevaría catálogo vivo.
+   */
+  complete: boolean;
+  /** Motivo legible cuando `complete` es falso. */
+  incompleteReason: string | null;
+};
+
 /**
  * Trae todos los ítems: siempre envía `limit` (Tokko default 20 si falta).
  * Paginación: por `offset` + `limit` o por `page` + `limit`, según TOKKO_PAGINATION.
  */
-async function fetchTokkoAllItems(pathSegment: string): Promise<Record<string, unknown>[]> {
+async function fetchTokkoAllItemsChecked(pathSegment: string): Promise<TokkoFetchResult> {
   const limit = Math.min(Math.max(Number(getEnv("TOKKO_LIMIT") ?? "2000") || 2000, 1), 10000);
   const mode = (getEnv("TOKKO_PAGINATION") ?? "offset").toLowerCase();
   const pageParam = getEnv("TOKKO_PAGE_PARAM") ?? "page";
@@ -210,6 +246,20 @@ async function fetchTokkoAllItems(pathSegment: string): Promise<Record<string, u
   const maxBatches = Number(getEnv("TOKKO_MAX_BATCHES") ?? "600") || 600;
 
   const out: Record<string, unknown>[] = [];
+  /** Último `total_count` que declaró Tokko, para contrastarlo al terminar. */
+  let totalCount: number | null = null;
+
+  /** Cierra la paginación; un `total_count` sin cubrir degrada cualquier final "natural". */
+  const finish = (complete: boolean, incompleteReason: string | null = null): TokkoFetchResult => {
+    if (complete && totalCount != null && out.length < totalCount) {
+      return {
+        items: out,
+        complete: false,
+        incompleteReason: `Tokko declaró ${totalCount} registros en ${pathSegment} y llegaron ${out.length}`,
+      };
+    }
+    return { items: out, complete, incompleteReason: complete ? null : incompleteReason };
+  };
 
   if (mode === "page") {
     for (let page = 1; page <= maxPages; page++) {
@@ -218,14 +268,15 @@ async function fetchTokkoAllItems(pathSegment: string): Promise<Record<string, u
         [pageParam]: String(page),
       });
       const items = extractItems(payload);
-      if (items.length === 0) break;
+      if (items.length === 0) return finish(true);
       out.push(...items);
       const meta = extractTokkoListMeta(payload);
-      if (meta.total_count != null && out.length >= meta.total_count) break;
+      if (meta.total_count != null) totalCount = meta.total_count;
+      if (meta.total_count != null && out.length >= meta.total_count) return finish(true);
       const pageLimit = meta.limit ?? limit;
-      if (items.length < pageLimit) break;
+      if (items.length < pageLimit) return finish(true);
     }
-    return out;
+    return finish(false, `se alcanzó el tope de ${maxPages} páginas (TOKKO_MAX_PAGES) en ${pathSegment}`);
   }
 
   let offset = 0;
@@ -237,11 +288,12 @@ async function fetchTokkoAllItems(pathSegment: string): Promise<Record<string, u
       [offsetParam]: String(offset),
     });
     const items = extractItems(payload);
-    if (items.length === 0) break;
+    if (items.length === 0) return finish(true);
     out.push(...items);
 
     const meta = extractTokkoListMeta(payload);
-    if (meta.total_count != null && out.length >= meta.total_count) break;
+    if (meta.total_count != null) totalCount = meta.total_count;
+    if (meta.total_count != null && out.length >= meta.total_count) return finish(true);
 
     offset += items.length;
 
@@ -249,15 +301,19 @@ async function fetchTokkoAllItems(pathSegment: string): Promise<Record<string, u
     const hasNext = next != null && next !== "" && next !== "null";
     if (!hasNext) {
       const pageCap = meta.limit ?? limit;
-      if (items.length < pageCap) break;
-      if (meta.total_count != null && out.length >= meta.total_count) break;
+      if (items.length < pageCap) return finish(true);
       // Sin `next` pero página llena: si Tokko envió total_count, seguir por offset hasta completar.
       if (meta.total_count != null && out.length < meta.total_count) continue;
-      break;
+      return finish(true);
     }
   }
 
-  return out;
+  return finish(false, `se alcanzó el tope de ${maxBatches} lotes (TOKKO_MAX_BATCHES) en ${pathSegment}`);
+}
+
+/** Como `fetchTokkoAllItemsChecked`, para los recursos que no archivan y no miran `complete`. */
+async function fetchTokkoAllItems(pathSegment: string): Promise<Record<string, unknown>[]> {
+  return (await fetchTokkoAllItemsChecked(pathSegment)).items;
 }
 
 /**
@@ -893,12 +949,180 @@ function deaccent(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function isManualTokkoId(tokkoId: string): boolean {
-  const clean = tokkoId.trim();
-  if (clean.startsWith("manual_")) return true;
-  const num = Number(clean);
-  if (Number.isInteger(num) && num >= 9000000 && num <= 9999999) return true;
-  return false;
+
+// ---------------------------------------------------------------------------
+// Baja de fichas ausentes en Tokko (`pruneMissing`) — ver docs/ADR-001.
+//
+// Archivar, nunca borrar: se marca `archived_at`, la ficha desaparece del sitio y
+// conserva lo que solo vive en el CRM (video, tour 3D, contacto, traducciones).
+// El borrado físico es una acción aparte y por ficha desde el panel.
+// ---------------------------------------------------------------------------
+
+type CatalogTable = "properties" | "developments";
+
+type PruneReport = {
+  /** Fichas activas del CRM que no vinieron en la respuesta de Tokko. */
+  count: number;
+  /** Muestra para el diálogo de confirmación (tope `PRUNE_SAMPLE_MAX`); el total va en `count`. */
+  candidates: PruneCandidate[];
+  /** Fichas sin archivar antes de esta pasada, base del porcentaje del umbral. */
+  totalActive: number;
+  /** Cuántas se archivaron de verdad: 0 en `dryRun` o si quedó bloqueado. */
+  archived: number;
+  /** Por qué no se aplicó, si no se aplicó. */
+  blocked: PruneBlockReason | null;
+  blockedDetail: string | null;
+};
+
+/** PostgREST corta en 1000 filas por defecto: el catálogo se lee por páginas o se pierden bajas. */
+const CATALOG_PAGE_SIZE = 1000;
+
+/** Lee el catálogo activo y devuelve las fichas cuyo `tokko_id` no vino de Tokko. */
+async function collectPruneCandidates(
+  supabase: SupabaseAdmin,
+  table: CatalogTable,
+  fetchedTokkoIds: Set<string>,
+): Promise<{ candidates: PruneCandidate[]; totalActive: number }> {
+  const labelColumn = table === "properties" ? "title" : "name";
+  const candidates: PruneCandidate[] = [];
+  let totalActive = 0;
+
+  for (let from = 0; ; from += CATALOG_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(`id, tokko_id, reference_code, ${labelColumn}`)
+      .is("archived_at", null)
+      .order("tokko_id")
+      .range(from, from + CATALOG_PAGE_SIZE - 1);
+    if (error) {
+      throw new Error(`No se pudo leer ${table} para calcular las bajas: ${error.message}`);
+    }
+    const rows = (data ?? []) as Record<string, unknown>[];
+    if (rows.length === 0) break;
+    totalActive += rows.length;
+
+    candidates.push(
+      ...selectPruneCandidates(
+        rows.map((row) => ({
+          id: String(row.id ?? ""),
+          tokko_id: String(row.tokko_id ?? ""),
+          label: str(row[labelColumn]) ?? "",
+          reference_code: str(row.reference_code),
+        })),
+        fetchedTokkoIds,
+      ),
+    );
+
+    if (rows.length < CATALOG_PAGE_SIZE) break;
+  }
+
+  return { candidates, totalActive };
+}
+
+/** Marca las fichas como archivadas. Devuelve cuántas quedaron efectivamente fuera del sitio. */
+async function archiveCandidates(
+  supabase: SupabaseAdmin,
+  table: CatalogTable,
+  candidates: PruneCandidate[],
+  errors: string[],
+): Promise<number> {
+  const ts = new Date().toISOString();
+  const chunk = 200;
+  let archived = 0;
+
+  for (let i = 0; i < candidates.length; i += chunk) {
+    const slice = candidates.slice(i, i + chunk);
+    const { error } = await supabase
+      .from(table)
+      .update({ archived_at: ts, archived_reason: "missing_in_tokko", updated_at: ts })
+      .in("tokko_id", slice.map((c) => c.tokko_id));
+    if (error) {
+      errors.push(`Error al dar de baja en ${table}: ${error.message}`);
+      continue;
+    }
+    archived += slice.length;
+  }
+
+  return archived;
+}
+
+/**
+ * Desarchiva lo que volvió a aparecer en Tokko (caso típico: ficha pausada que se republica).
+ * Solo toca `archived_reason = 'missing_in_tokko'`: una baja hecha a mano en el panel no debe
+ * revivir sola en cada importación.
+ */
+async function unarchiveReturned(
+  supabase: SupabaseAdmin,
+  table: CatalogTable,
+  fetchedTokkoIds: string[],
+  errors: string[],
+): Promise<number> {
+  const ts = new Date().toISOString();
+  const chunk = 200;
+  let restored = 0;
+
+  for (let i = 0; i < fetchedTokkoIds.length; i += chunk) {
+    const slice = fetchedTokkoIds.slice(i, i + chunk);
+    const { data, error } = await supabase
+      .from(table)
+      .update({ archived_at: null, archived_reason: null, updated_at: ts })
+      .in("tokko_id", slice)
+      .eq("archived_reason", "missing_in_tokko")
+      .select("id");
+    if (error) {
+      errors.push(`Error al reactivar en ${table}: ${error.message}`);
+      continue;
+    }
+    restored += (data ?? []).length;
+  }
+
+  return restored;
+}
+
+/**
+ * Calcula (y opcionalmente aplica) la baja de las fichas ausentes en Tokko.
+ * Con `apply: false` no escribe nada: es la vista previa que confirma el usuario en el panel.
+ */
+async function runPrune(
+  supabase: SupabaseAdmin,
+  table: CatalogTable,
+  fetchedTokkoIds: string[],
+  opts: {
+    apply: boolean;
+    fetchComplete: boolean;
+    incompleteReason: string | null;
+    hasErrors: boolean;
+    force: boolean;
+  },
+  errors: string[],
+): Promise<PruneReport> {
+  const { candidates, totalActive } = await collectPruneCandidates(
+    supabase,
+    table,
+    new Set(fetchedTokkoIds),
+  );
+
+  const report: PruneReport = {
+    count: candidates.length,
+    candidates: candidates.slice(0, PRUNE_SAMPLE_MAX),
+    totalActive,
+    archived: 0,
+    blocked: null,
+    blockedDetail: null,
+  };
+
+  const block = pruneBlockReason({ count: candidates.length, totalActive }, opts);
+  if (block) {
+    report.blocked = block.reason;
+    report.blockedDetail = block.detail;
+    return report;
+  }
+
+  if (opts.apply && candidates.length > 0) {
+    report.archived = await archiveCandidates(supabase, table, candidates, errors);
+  }
+
+  return report;
 }
 
 
@@ -1067,19 +1291,25 @@ Deno.serve(async (req: Request) => {
       resources?: ResourceKey[];
       dryRun?: boolean;
       /** Inserta únicamente registros nuevos (tokko_id / lead_kind+tokko_id no vistos), sin
-       *  actualizar existentes ni borrar obsoletos. Usado por los botones "Importar" del panel. */
+       *  actualizar existentes. Usado por los botones "Importar" del panel. */
       insertOnlyNew?: boolean;
       /** Modo del recurso "properties" para el botón del panel: "new_only" solo inserta
        *  tokko_id nuevos; "update_only" solo actualiza existentes; "sync_all" inserta y
-       *  actualiza. Ninguno de los tres borra propiedades obsoletas (eso queda reservado
-       *  al modo completo del cron/curl, que no envía propertiesMode ni insertOnlyNew).
+       *  actualiza. Ninguno de los tres da de baja por sí solo: eso lo pide `pruneMissing`.
        *  Tiene precedencia sobre insertOnlyNew para properties; insertOnlyNew se mantiene
        *  por compatibilidad (frontend viejo, o función vieja que ignore este campo). */
       propertiesMode?: "new_only" | "update_only" | "sync_all";
       /** Modo del recurso "developments" para el botón del panel; mismo contrato que
-       *  `propertiesMode`: ninguno de los tres borra desarrollos obsoletos (eso queda
-       *  reservado al modo completo del cron/curl, que no envía developmentsMode). */
+       *  `propertiesMode`. */
       developmentsMode?: "new_only" | "update_only" | "sync_all";
+      /** Da de baja (archiva) las fichas del CRM que ya no están en Tokko. Combinable con
+       *  cualquier modo. Con `dryRun: true` solo devuelve la lista de candidatas sin tocar
+       *  nada: es la vista previa que el panel muestra antes de confirmar. Ver docs/ADR-001. */
+      pruneMissing?: boolean;
+      /** Salta únicamente el umbral proporcional de `pruneMissing`, tras la segunda
+       *  confirmación del usuario. Nunca salta el bloqueo por catálogo incompleto ni por
+       *  errores de importación. */
+      forcePrune?: boolean;
       /** Para retomar contact/web_contact entre invocaciones cuando el dataset es grande
        *  (ver fetchTokkoItemsSince) — el frontend reenvía el `nextOffset` recibido hasta
        *  que `hasMore` sea false. */
@@ -1092,7 +1322,9 @@ Deno.serve(async (req: Request) => {
 
     const dryRun = Boolean(body.dryRun);
     const insertOnlyNew = Boolean(body.insertOnlyNew);
-    /** "full" = modo legado del cron/curl: upsert de todo + borrado de obsoletas. */
+    const pruneMissing = Boolean(body.pruneMissing);
+    const forcePrune = Boolean(body.forcePrune);
+    /** "full" = modo legado del cron/curl: upsert de todo + baja de las ausentes. */
     const propertiesMode: "new_only" | "update_only" | "sync_all" | "full" =
       body.propertiesMode === "new_only" ||
       body.propertiesMode === "update_only" ||
@@ -1101,7 +1333,7 @@ Deno.serve(async (req: Request) => {
         : insertOnlyNew
           ? "new_only"
           : "full";
-    /** Igual que propertiesMode: "full" es el modo legado del cron/curl (upsert + borrado). */
+    /** Igual que propertiesMode: "full" es el modo legado del cron/curl (upsert + baja). */
     const developmentsMode: "new_only" | "update_only" | "sync_all" | "full" =
       body.developmentsMode === "new_only" ||
       body.developmentsMode === "update_only" ||
@@ -1124,6 +1356,10 @@ Deno.serve(async (req: Request) => {
         skippedNew?: number;
         hasMore?: boolean;
         nextOffset?: number;
+        /** Fichas archivadas que volvieron a aparecer en Tokko y se reactivaron. */
+        restored?: number;
+        /** Resultado de la baja de fichas ausentes en Tokko (solo properties/developments). */
+        prune?: PruneReport;
         errors: string[];
       }
     > = {};
@@ -1179,9 +1415,31 @@ Deno.serve(async (req: Request) => {
         let updated = 0;
         let skippedExisting = 0;
         let skippedNew = 0;
-        let items = await fetchTokkoAllItems(pathDevs);
+        const devFetch = await fetchTokkoAllItemsChecked(pathDevs);
+        let items = devFetch.items;
+        /** Ids tal como vinieron de Tokko, sin filtrar por modo: base de la baja y del desarchivado. */
+        const allFetchedDevIds = items.map((item) => String(pickTokkoId(item))).filter(Boolean);
+        /** El modo completo del cron/curl siempre depura; desde el panel, solo si lo piden. */
+        const pruneDevs = pruneMissing || developmentsMode === "full";
+
         if (dryRun) {
           summary.developments = { upserted: items.length, errors: [] };
+          if (pruneDevs) {
+            // Vista previa: lee el catálogo para listar las bajas, sin escribir nada.
+            summary.developments.prune = await runPrune(
+              supabase,
+              "developments",
+              allFetchedDevIds,
+              {
+                apply: false,
+                fetchComplete: devFetch.complete,
+                incompleteReason: devFetch.incompleteReason,
+                hasErrors: false,
+                force: forcePrune,
+              },
+              errors,
+            );
+          }
         } else {
           // Modos del panel: hace falta saber qué tokko_id ya existen, tanto para filtrar
           // (new_only/update_only) como para reportar creados vs actualizados (sync_all).
@@ -1242,36 +1500,39 @@ Deno.serve(async (req: Request) => {
               errors.push(e instanceof Error ? e.message : String(e));
             }
           }
-          // Solo el modo completo (cron/curl) borra obsoletos; los modos del panel
-          // (new_only/update_only/sync_all) solo insertan/actualizan. Además, en esos modos
-          // `items` viene filtrado, así que usarlo aquí borraría de más.
-          if (developmentsMode === "full") {
-            // Clean up obsolete developments (not in Tokko Broker responses and not manual)
-            const fetchedTokkoIds = items.map((item) => String(pickTokkoId(item))).filter(Boolean);
-            if (fetchedTokkoIds.length > 0 && errors.length === 0) {
-              const { data: dbDevs, error: fetchErr } = await supabase
-                .from("developments")
-                .select("tokko_id");
-              if (!fetchErr && dbDevs) {
-                const idsToDelete = dbDevs
-                  .map((d) => String(d.tokko_id))
-                  .filter((tokkoId) => !fetchedTokkoIds.includes(tokkoId) && !isManualTokkoId(tokkoId));
-                if (idsToDelete.length > 0) {
-                  const { error: delErr } = await supabase
-                    .from("developments")
-                    .delete()
-                    .in("tokko_id", idsToDelete);
-                  if (delErr) {
-                    errors.push(`Error al limpiar desarrollos obsoletos: ${delErr.message}`);
-                  }
-                }
-              }
-            }
-          }
+          // Lo que volvió a aparecer en Tokko deja de estar dado de baja, se depure o no.
+          // `allFetchedDevIds` no está filtrado por modo, así que también rescata en "new_only",
+          // donde el desarrollo se salta por existir ya en la base.
+          const restoredDevs =
+            allFetchedDevIds.length > 0
+              ? await unarchiveReturned(supabase, "developments", allFetchedDevIds, errors)
+              : 0;
+
+          // La baja archiva (`archived_at`), nunca borra: ver docs/ADR-001. Se calcula sobre
+          // `allFetchedDevIds` porque `items` viene filtrado por modo y daría de baja de más.
+          const devPrune =
+            pruneDevs && allFetchedDevIds.length > 0
+              ? await runPrune(
+                  supabase,
+                  "developments",
+                  allFetchedDevIds,
+                  {
+                    apply: true,
+                    fetchComplete: devFetch.complete,
+                    incompleteReason: devFetch.incompleteReason,
+                    hasErrors: errors.length > 0,
+                    force: forcePrune,
+                  },
+                  errors,
+                )
+              : null;
+
           summary.developments =
             developmentsMode === "full"
               ? { upserted, errors }
               : { upserted, created, updated, skippedExisting, skippedNew, errors };
+          if (restoredDevs > 0) summary.developments.restored = restoredDevs;
+          if (devPrune) summary.developments.prune = devPrune;
         }
       } catch (e) {
         summary.developments = {
@@ -1357,7 +1618,12 @@ Deno.serve(async (req: Request) => {
         let updated = 0;
         let skippedExisting = 0;
         let skippedNew = 0;
-        let items = await fetchTokkoAllItems(pathProps);
+        const propsFetch = await fetchTokkoAllItemsChecked(pathProps);
+        let items = propsFetch.items;
+        /** Ids tal como vinieron de Tokko, sin filtrar por modo: base de la baja y del desarchivado. */
+        const allFetchedPropIds = items.map((item) => String(pickTokkoId(item))).filter(Boolean);
+        /** El modo completo del cron/curl siempre depura; desde el panel, solo si lo piden. */
+        const pruneProps = pruneMissing || propertiesMode === "full";
 
         // Modos del panel: hace falta saber qué tokko_id ya existen, tanto para filtrar
         // (new_only/update_only) como para reportar creadas vs actualizadas (sync_all).
@@ -1401,6 +1667,22 @@ Deno.serve(async (req: Request) => {
             propertiesMode === "full"
               ? { upserted: items.length, errors: [] }
               : { upserted: items.length, created, updated, skippedExisting, skippedNew, errors: [] };
+          if (pruneProps) {
+            // Vista previa: lee el catálogo para listar las bajas, sin escribir nada.
+            summary.properties.prune = await runPrune(
+              supabase,
+              "properties",
+              allFetchedPropIds,
+              {
+                apply: false,
+                fetchComplete: propsFetch.complete,
+                incompleteReason: propsFetch.incompleteReason,
+                hasErrors: false,
+                force: forcePrune,
+              },
+              errors,
+            );
+          }
         } else {
           const batch = 80;
           for (let i = 0; i < items.length; i += batch) {
@@ -1449,35 +1731,39 @@ Deno.serve(async (req: Request) => {
             }
             await syncPropertyTagLinksForBatch(supabase, pairs, byTokko, errors);
           }
-          // El borrado de obsoletas queda reservado al modo completo del cron/curl; los
-          // modos del panel (new_only/update_only/sync_all) solo insertan/actualizan.
-          if (propertiesMode === "full") {
-            // Clean up obsolete properties (not in Tokko Broker responses and not manual)
-            const fetchedTokkoIds = items.map((item) => String(pickTokkoId(item))).filter(Boolean);
-            if (fetchedTokkoIds.length > 0 && errors.length === 0) {
-              const { data: dbProps, error: fetchErr } = await supabase
-                .from("properties")
-                .select("tokko_id");
-              if (!fetchErr && dbProps) {
-                const idsToDelete = dbProps
-                  .map((p) => String(p.tokko_id))
-                  .filter((tokkoId) => !fetchedTokkoIds.includes(tokkoId) && !isManualTokkoId(tokkoId));
-                if (idsToDelete.length > 0) {
-                  const { error: delErr } = await supabase
-                    .from("properties")
-                    .delete()
-                    .in("tokko_id", idsToDelete);
-                  if (delErr) {
-                    errors.push(`Error al limpiar propiedades obsoletas: ${delErr.message}`);
-                  }
-                }
-              }
-            }
-          }
+          // Lo que volvió a aparecer en Tokko deja de estar dado de baja, se depure o no.
+          // `allFetchedPropIds` no está filtrado por modo, así que también rescata en "new_only",
+          // donde la propiedad se salta por existir ya en la base.
+          const restoredProps =
+            allFetchedPropIds.length > 0
+              ? await unarchiveReturned(supabase, "properties", allFetchedPropIds, errors)
+              : 0;
+
+          // La baja archiva (`archived_at`), nunca borra: ver docs/ADR-001. Se calcula sobre
+          // `allFetchedPropIds` porque `items` viene filtrado por modo y daría de baja de más.
+          const propsPrune =
+            pruneProps && allFetchedPropIds.length > 0
+              ? await runPrune(
+                  supabase,
+                  "properties",
+                  allFetchedPropIds,
+                  {
+                    apply: true,
+                    fetchComplete: propsFetch.complete,
+                    incompleteReason: propsFetch.incompleteReason,
+                    hasErrors: errors.length > 0,
+                    force: forcePrune,
+                  },
+                  errors,
+                )
+              : null;
+
           summary.properties =
             propertiesMode === "full"
               ? { upserted, errors }
               : { upserted, created, updated, skippedExisting, skippedNew, errors };
+          if (restoredProps > 0) summary.properties.restored = restoredProps;
+          if (propsPrune) summary.properties.prune = propsPrune;
         }
       } catch (e) {
         summary.properties = {

@@ -11,6 +11,7 @@ import {
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { messageFromFunctionsError } from "./tokkoImportTypes";
 
 type SyncStep = "idle" | "syncing" | "done" | "error";
 type LeadKind = "contact" | "web_contact";
@@ -50,32 +51,6 @@ type Props = {
 
 /** Tope de idas y vueltas al backend para un solo click de importar (red de seguridad, no un límite normal de uso). */
 const MAX_SYNC_ITERATIONS = 60;
-
-/** Extrae un mensaje de error legible de un FunctionsHttpError de supabase-js (ver PropertyImportDialog). */
-async function messageFromFunctionsError(error: { message: string; context?: unknown }): Promise<string> {
-  const ctx = error.context as { clone?: () => Response; response?: Response } | undefined;
-  const maybeResponse =
-    ctx && typeof ctx.clone === "function" ? (ctx as unknown as Response) : (ctx?.response ?? null);
-
-  if (maybeResponse) {
-    try {
-      const parsed = (await maybeResponse.clone().json()) as { error?: string };
-      if (parsed?.error) return parsed.error;
-    } catch {
-      try {
-        const text = (await maybeResponse.clone().text()).trim();
-        if (text) return text;
-      } catch {
-        // ignorado
-      }
-    }
-  }
-
-  if (/Failed to send|TypeError|fetch/i.test(error.message)) {
-    return "No se pudo contactar la función tokko-sync. Verifica que esté desplegada (`supabase functions deploy tokko-sync`).";
-  }
-  return error.message;
-}
 
 /** Importa leads (contactos) nuevos directamente desde Tokko Broker (sin tocar ni borrar los existentes). */
 export function LeadImportDialog({ open, onOpenChange, onImportComplete }: Props) {

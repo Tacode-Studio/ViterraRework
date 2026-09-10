@@ -7,6 +7,7 @@ import {
   Download,
   Edit,
   Eye,
+  EyeOff,
   Link2,
   LayoutGrid,
   Map as MapIcon,
@@ -16,6 +17,7 @@ import {
   Search,
   ChevronDown,
   Filter,
+  RotateCcw,
   Star,
   Trash2,
   TrendingUp,
@@ -48,7 +50,12 @@ interface Props {
   onLinkProperty?: (property: Property, linkTokkoId: string) => void | Promise<void>;
   onUnlinkProperty?: (property: Property) => void | Promise<void>;
   onSave: (input: Development) => boolean | Promise<boolean>;
+  /** Borrado definitivo (irreversible). La baja reversible es `onRestore` a la inversa. */
   onDelete: (id: string) => void | Promise<void>;
+  /** Reactiva un desarrollo dado de baja (`archived_at`) para que vuelva al sitio. */
+  onRestore?: (development: Development) => void | Promise<void>;
+  /** Da de baja un desarrollo a mano: deja de publicarse, sin borrar nada. */
+  onArchive?: (development: Development) => void | Promise<void>;
   onEditProperty?: (property: Property) => void;
   /** El botón "Importar de Tokko" solo se muestra a role='admin' (igual que en propiedades). */
   onImport?: () => void;
@@ -65,6 +72,31 @@ const DEVELOPMENT_STATUSES: Development["status"][] = [
   "Próximamente",
 ];
 
+/** Distintivo de desarrollo dado de baja: no se publica en el sitio. Ver docs/ADR-001. */
+function ArchivedBadge({
+  development,
+  className = "",
+}: {
+  development: Development;
+  className?: string;
+}) {
+  const reason =
+    development.archivedReason === "manual"
+      ? "Baja hecha desde el panel"
+      : "Ya no está en Tokko Broker";
+  const since = development.archivedAt
+    ? new Date(development.archivedAt).toLocaleDateString("es-MX")
+    : null;
+  return (
+    <span
+      className={`inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-800 ring-1 ring-amber-200/80 ${className}`}
+      title={since ? `${reason} · desde el ${since}` : reason}
+    >
+      Dado de baja
+    </span>
+  );
+}
+
 export function AdminDevelopmentsManager({
   developments,
   catalogProperties = [],
@@ -74,6 +106,8 @@ export function AdminDevelopmentsManager({
   onUnlinkProperty,
   onSave,
   onDelete,
+  onRestore,
+  onArchive,
   onEditProperty,
   onImport,
 }: Props) {
@@ -89,6 +123,11 @@ export function AdminDevelopmentsManager({
   const [locationFilter, setLocationFilter] = useState("all");
   const [constructionFilter, setConstructionFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
+  /**
+   * Publicados vs dados de baja (`archived_at`): son listas disjuntas, no un filtro más.
+   * Ver docs/ADR-001.
+   */
+  const [archivedFilter, setArchivedFilter] = useState<"active" | "archived">("active");
   const [deliveryFilter, setDeliveryFilter] = useState("all");
   const [inventoryView, setInventoryView] = useState<"cards" | "list" | "map">("cards");
   const typeOptions = useMemo(
@@ -104,10 +143,18 @@ export function AdminDevelopmentsManager({
     [developments]
   );
 
+  const archivedCount = useMemo(
+    () => developments.filter((d) => d.archivedAt).length,
+    [developments],
+  );
+
   const filteredDevelopments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const refQ = referenceCodeQuery.trim().toLowerCase();
     return developments.filter((d) => {
+      const matchesArchived =
+        archivedFilter === "archived" ? Boolean(d.archivedAt) : !d.archivedAt;
+      if (!matchesArchived) return false;
       const matchesSearch =
         !q ||
         [d.name, d.location, d.type, d.status, d.colony].some((field) =>
@@ -134,6 +181,7 @@ export function AdminDevelopmentsManager({
     });
   }, [
     developments,
+    archivedFilter,
     searchQuery,
     referenceCodeQuery,
     typeFilter,
@@ -142,9 +190,18 @@ export function AdminDevelopmentsManager({
     stateFilter,
     deliveryFilter,
   ]);
-  const preSaleCount = developments.filter((d) => d.status === "Pre-venta").length;
-  const availableCount = developments.filter((d) => d.status === "Disponible").length;
-  const featuredCount = useMemo(() => developments.filter((d) => d.featured).length, [developments]);
+  // Las estadísticas de arriba cuentan solo lo publicado: un desarrollo dado de baja no está
+  // ni en pre-venta ni disponible para nadie.
+  const activeDevelopments = useMemo(
+    () => developments.filter((d) => !d.archivedAt),
+    [developments],
+  );
+  const preSaleCount = activeDevelopments.filter((d) => d.status === "Pre-venta").length;
+  const availableCount = activeDevelopments.filter((d) => d.status === "Disponible").length;
+  const featuredCount = useMemo(
+    () => activeDevelopments.filter((d) => d.featured).length,
+    [activeDevelopments],
+  );
 
   const openCreate = () => {
     setNewDevelopmentId(crypto.randomUUID());
@@ -338,6 +395,23 @@ export function AdminDevelopmentsManager({
 
             <div className="relative shrink-0">
               <select
+                value={archivedFilter}
+                onChange={(e) => setArchivedFilter(e.target.value as "active" | "archived")}
+                className="appearance-none border-none bg-transparent py-1 pl-2 pr-7 text-sm font-medium text-slate-600 hover:text-slate-900 focus:ring-0 cursor-pointer"
+                aria-label="Ver desarrollos publicados o dados de baja"
+              >
+                <option value="active">Publicados</option>
+                <option value="archived">
+                  Dados de baja{archivedCount > 0 ? ` (${archivedCount})` : ""}
+                </option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" strokeWidth={2} />
+            </div>
+
+            <div className="h-5 w-px bg-slate-300 shrink-0" />
+
+            <div className="relative shrink-0">
+              <select
                 value={stateFilter}
                 onChange={(e) => setStateFilter(e.target.value)}
                 className="appearance-none border-none bg-transparent py-1 pl-2 pr-7 text-sm font-medium text-slate-600 hover:text-slate-900 focus:ring-0 cursor-pointer"
@@ -489,6 +563,9 @@ export function AdminDevelopmentsManager({
                           <p className="line-clamp-2 text-sm font-medium text-slate-900" style={{ fontWeight: 600 }}>
                             {development.name}
                           </p>
+                          {development.archivedAt && (
+                            <ArchivedBadge development={development} className="mt-1" />
+                          )}
                           <p className="mt-0.5 text-xs text-slate-500" style={{ fontWeight: 500 }}>
                             {development.units} unidades
                           </p>
@@ -546,11 +623,31 @@ export function AdminDevelopmentsManager({
                             >
                               <Edit className="h-4 w-4" strokeWidth={1.5} />
                             </button>
+                            {!development.archivedAt && onArchive && (
+                              <button
+                                type="button"
+                                onClick={() => void onArchive(development)}
+                                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-amber-50 hover:text-amber-700"
+                                title="Dar de baja: deja de mostrarse en el sitio, sin borrarlo"
+                              >
+                                <EyeOff className="h-4 w-4" strokeWidth={1.5} />
+                              </button>
+                            )}
+                            {development.archivedAt && onRestore && (
+                              <button
+                                type="button"
+                                onClick={() => void onRestore(development)}
+                                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-green-50 hover:text-green-700"
+                                title="Restaurar: vuelve a publicarse en el sitio"
+                              >
+                                <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setDeleteTargetId(development.id)}
                               className="rounded-lg p-2 text-slate-400 transition-all hover:bg-red-50 hover:text-red-600"
-                              title="Eliminar"
+                              title={development.archivedAt ? "Eliminar definitivamente" : "Eliminar"}
                             >
                               <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                             </button>
@@ -633,6 +730,9 @@ export function AdminDevelopmentsManager({
                 <h3 className="mb-2 text-lg font-medium leading-tight text-slate-900">
                   {development.name}
                 </h3>
+                {development.archivedAt && (
+                  <ArchivedBadge development={development} className="mb-2" />
+                )}
                 <p className="mb-2 flex items-center gap-1.5 text-sm text-slate-500">
                   <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} />
                   {development.location}
@@ -679,11 +779,31 @@ export function AdminDevelopmentsManager({
                         >
                           <Edit className="h-4 w-4" strokeWidth={1.5} />
                         </button>
+                        {!development.archivedAt && onArchive && (
+                          <button
+                            type="button"
+                            onClick={() => void onArchive(development)}
+                            className="rounded p-2 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                            title="Dar de baja: deja de mostrarse en el sitio, sin borrarlo"
+                          >
+                            <EyeOff className="h-4 w-4" strokeWidth={1.5} />
+                          </button>
+                        )}
+                        {development.archivedAt && onRestore && (
+                          <button
+                            type="button"
+                            onClick={() => void onRestore(development)}
+                            className="rounded p-2 text-slate-400 transition-colors hover:bg-green-50 hover:text-green-700"
+                            title="Restaurar: vuelve a publicarse en el sitio"
+                          >
+                            <RotateCcw className="h-4 w-4" strokeWidth={1.5} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setDeleteTargetId(development.id)}
                           className="rounded p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                          title="Eliminar"
+                          title={development.archivedAt ? "Eliminar definitivamente" : "Eliminar"}
                         >
                           <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                         </button>
@@ -759,10 +879,12 @@ export function AdminDevelopmentsManager({
       <AlertDialog open={deleteTargetId !== null} onOpenChange={(o) => !o && setDeleteTargetId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este desarrollo?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar este desarrollo definitivamente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se ocultará del panel admin. Las propiedades vinculadas conservan su desarrollo asignado hasta que
-              lo cambies en cada ficha.
+              Se borra del CRM junto con sus unidades y traducciones, y no se puede deshacer. Si solo
+              quieres que deje de mostrarse en el sitio, dalo de baja: se conserva todo y puedes
+              restaurarlo. Las propiedades vinculadas conservan su desarrollo asignado hasta que lo
+              cambies en cada ficha.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

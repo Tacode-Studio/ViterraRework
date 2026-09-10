@@ -12,9 +12,14 @@ export function useCatalogPriceSlices() {
     const client = getSupabaseClient();
     if (!client) return;
 
-    void client
-      .from("properties")
-      .select("price, status")
+    // Las fichas dadas de baja no deben mover el rango del slider (docs/ADR-001); si la
+    // columna aún no existe, se reintenta sin el filtro antes que quedarse sin precios.
+    const query = async () => {
+      const res = await client.from("properties").select("price, status").is("archived_at", null);
+      return res.error ? await client.from("properties").select("price, status") : res;
+    };
+
+    void query()
       .then(({ data, error }) => {
         if (error || !data?.length) return;
         const venta: number[] = [];

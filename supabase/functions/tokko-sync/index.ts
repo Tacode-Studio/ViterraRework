@@ -376,24 +376,55 @@ function firstOperationRecord(item: Record<string, unknown>): Record<string, unk
   return asRecord(ops[0]);
 }
 
-function priceFromTokkoOperations(item: Record<string, unknown>): number {
-  const op = firstOperationRecord(item);
-  if (!op) return num(item.price ?? item.amount ?? item.operation_amount) ?? 0;
-  const prices = op.prices;
-  if (Array.isArray(prices) && prices.length > 0) {
-    const p0 = asRecord(prices[0]);
-    const p = num(p0?.price);
-    if (p != null) return p;
+function propertyVentaAlquiler(item: Record<string, unknown>): "venta" | "alquiler" | "venta_y_alquiler" {
+  const ops = item.operations;
+  let hasVenta = false;
+  let hasAlquiler = false;
+
+  if (Array.isArray(ops)) {
+    for (const op of ops) {
+      const opRec = asRecord(op);
+      const ot = (str(opRec?.operation_type) ?? "").toLowerCase();
+      if (/alquiler|rent|renta|temporal/i.test(ot)) hasAlquiler = true;
+      else if (/venta|sale/i.test(ot)) hasVenta = true;
+    }
   }
-  return num(op.price) ?? num(item.price) ?? 0;
+
+  if (item.has_temporary_rent === true) hasAlquiler = true;
+
+  if (hasVenta && hasAlquiler) return "venta_y_alquiler";
+  if (hasAlquiler) return "alquiler";
+  return "venta";
 }
 
-function propertyVentaAlquiler(item: Record<string, unknown>): "venta" | "alquiler" {
-  const op = firstOperationRecord(item);
-  const ot = (str(op?.operation_type) ?? "").toLowerCase();
-  if (/alquiler|rent|renta|temporal/i.test(ot)) return "alquiler";
-  if (item.has_temporary_rent === true) return "alquiler";
-  return "venta";
+function extractPrices(item: Record<string, unknown>): { price: number; rentalPrice: number | null } {
+  let price = num(item.price ?? item.amount ?? item.operation_amount) ?? 0;
+  let rentalPrice: number | null = null;
+  const ops = item.operations;
+  
+  if (Array.isArray(ops)) {
+    for (const op of ops) {
+      const opRec = asRecord(op);
+      const ot = (str(opRec?.operation_type) ?? "").toLowerCase();
+      const isAlquiler = /alquiler|rent|renta|temporal/i.test(ot);
+      let opPrice = num(opRec?.price) ?? 0;
+      
+      const pricesArr = opRec?.prices;
+      if (Array.isArray(pricesArr) && pricesArr.length > 0) {
+        const p0 = asRecord(pricesArr[0]);
+        const p = num(p0?.price);
+        if (p != null) opPrice = p;
+      }
+      
+      if (isAlquiler) {
+        rentalPrice = opPrice;
+      } else {
+        price = opPrice;
+      }
+    }
+  }
+  
+  return { price, rentalPrice };
 }
 
 /** Id Tokko del tipo de inmueble (`type` objeto o URI). */
@@ -508,7 +539,21 @@ function mapPropertyRow(item: Record<string, unknown>): Record<string, unknown> 
   const landSurf = num(item.surface);
   const area = totalSurf ?? landSurf ?? num(item.livable_area) ?? num(item.covered_surface) ?? roofedSurf ?? 0;
 
-  const pubTitle = str(item.publication_title ?? item.title ?? item.name ?? item.fake_address) ?? "";
+  /**
+   * Tokko's `title` field is often auto-generated ("Departamento en [location]").
+   * The actual listing title set by the agent lives in `publication_title` or,
+   * when that's empty, in `fake_address` (the public address / headline shown
+   * in Tokko Broker's own UI). We prioritise those over the generic `title`.
+   *
+   * We use `||` instead of `??` because `str()` returns `""` for empty strings
+   * and `??` would not skip them — we need falsy (empty) values to fall through.
+   */
+  const pubTitle =
+    str(item.publication_title)?.trim() ||
+    str(item.fake_address)?.trim() ||
+    str(item.title)?.trim() ||
+    str(item.name)?.trim() ||
+    "";
   const colony = str(loc?.name) ?? "";
   const location =
     str(loc?.short_location) ?? str(loc?.full_location) ?? str(item.location) ?? colony;
@@ -522,8 +567,12 @@ function mapPropertyRow(item: Record<string, unknown>): Record<string, unknown> 
   return {
     tokko_id,
     title: pubTitle,
-    publication_title: str(item.publication_title) ?? pubTitle,
-    price: priceFromTokkoOperations(item),
+    publication_title:
+      str(item.publication_title)?.trim() ||
+      str(item.fake_address)?.trim() ||
+      pubTitle,
+    price: extractPrices(item).price,
+    rental_price: extractPrices(item).rentalPrice,
     location,
     colony,
     full_address,
@@ -1327,8 +1376,8 @@ Deno.serve(async (req: Request) => {
     /** "full" = modo legado del cron/curl: upsert de todo + baja de las ausentes. */
     const propertiesMode: "new_only" | "update_only" | "sync_all" | "full" =
       body.propertiesMode === "new_only" ||
-      body.propertiesMode === "update_only" ||
-      body.propertiesMode === "sync_all"
+        body.propertiesMode === "update_only" ||
+        body.propertiesMode === "sync_all"
         ? body.propertiesMode
         : insertOnlyNew
           ? "new_only"
@@ -1336,8 +1385,8 @@ Deno.serve(async (req: Request) => {
     /** Igual que propertiesMode: "full" es el modo legado del cron/curl (upsert + baja). */
     const developmentsMode: "new_only" | "update_only" | "sync_all" | "full" =
       body.developmentsMode === "new_only" ||
-      body.developmentsMode === "update_only" ||
-      body.developmentsMode === "sync_all"
+        body.developmentsMode === "update_only" ||
+        body.developmentsMode === "sync_all"
         ? body.developmentsMode
         : insertOnlyNew
           ? "new_only"
@@ -1513,18 +1562,18 @@ Deno.serve(async (req: Request) => {
           const devPrune =
             pruneDevs && allFetchedDevIds.length > 0
               ? await runPrune(
-                  supabase,
-                  "developments",
-                  allFetchedDevIds,
-                  {
-                    apply: true,
-                    fetchComplete: devFetch.complete,
-                    incompleteReason: devFetch.incompleteReason,
-                    hasErrors: errors.length > 0,
-                    force: forcePrune,
-                  },
-                  errors,
-                )
+                supabase,
+                "developments",
+                allFetchedDevIds,
+                {
+                  apply: true,
+                  fetchComplete: devFetch.complete,
+                  incompleteReason: devFetch.incompleteReason,
+                  hasErrors: errors.length > 0,
+                  force: forcePrune,
+                },
+                errors,
+              )
               : null;
 
           summary.developments =
@@ -1744,18 +1793,18 @@ Deno.serve(async (req: Request) => {
           const propsPrune =
             pruneProps && allFetchedPropIds.length > 0
               ? await runPrune(
-                  supabase,
-                  "properties",
-                  allFetchedPropIds,
-                  {
-                    apply: true,
-                    fetchComplete: propsFetch.complete,
-                    incompleteReason: propsFetch.incompleteReason,
-                    hasErrors: errors.length > 0,
-                    force: forcePrune,
-                  },
-                  errors,
-                )
+                supabase,
+                "properties",
+                allFetchedPropIds,
+                {
+                  apply: true,
+                  fetchComplete: propsFetch.complete,
+                  incompleteReason: propsFetch.incompleteReason,
+                  hasErrors: errors.length > 0,
+                  force: forcePrune,
+                },
+                errors,
+              )
               : null;
 
           summary.properties =
@@ -1886,14 +1935,14 @@ Deno.serve(async (req: Request) => {
           }
           summary[kind] = insertOnlyNew
             ? {
-                upserted,
-                skippedExisting,
-                skipped_lead_status,
-                fetched: items.length,
-                errors,
-                hasMore: nextOffset !== null,
-                nextOffset: nextOffset ?? undefined,
-              }
+              upserted,
+              skippedExisting,
+              skipped_lead_status,
+              fetched: items.length,
+              errors,
+              hasMore: nextOffset !== null,
+              nextOffset: nextOffset ?? undefined,
+            }
             : { upserted, skipped_lead_status, fetched: items.length, errors };
         }
       } catch (e) {

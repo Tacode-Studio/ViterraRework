@@ -168,11 +168,19 @@ export function rowToProperty(row: PropertyRow): Property {
         ? row.updated_at
         : undefined;
   const pubTitle = row.publication_title?.trim();
+  const fullAddr = row.full_address?.trim();
+  /**
+   * Tokko's `title` column is often an auto-generated generic like
+   * "Departamento en [location]". The real listing title that the agent set
+   * in Tokko lives in `full_address` (or `publication_title` when present).
+   * We resolve the effective title once here so every consumer gets it right.
+   */
+  const effectiveTitle = fullAddr || pubTitle || row.title;
   const listingAt = row.synced_at || row.updated_at;
   const galleryUrls = buildGalleryUrls(primary, imgs);
   return {
     id: row.id,
-    title: row.title,
+    title: effectiveTitle,
     price: Number(row.price ?? 0),
     rentalPrice: optionalPositiveNum(row.rental_price),
     location: row.location ?? "",
@@ -194,8 +202,8 @@ export function rowToProperty(row: PropertyRow): Property {
     amenities: textArrayCol(row.amenities),
     services: textArrayCol(row.services),
     additionalFeatures: textArrayCol(row.additional_features),
-    publicationTitle: pubTitle || undefined,
-    fullAddress: row.full_address?.trim() || undefined,
+    publicationTitle: fullAddr || pubTitle || undefined,
+    fullAddress: fullAddr || undefined,
     description: row.description?.trim() || undefined,
     richDescription: row.rich_description?.trim() || undefined,
     referenceCode: row.reference_code?.trim() || undefined,

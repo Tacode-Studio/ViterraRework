@@ -4,6 +4,45 @@ import type { Property } from "./PropertyCard";
 import { escapeHtml } from "../lib/escapeHtml";
 import { getViterraStreetTileLayer } from "../lib/mapTileConfig";
 
+function computeDisplayCoordinates(list: Property[]): Map<string, { lat: number; lng: number }> {
+  const grouped = new Map<string, Property[]>();
+  const out = new Map<string, { lat: number; lng: number }>();
+
+  for (const p of list) {
+    if (!p.coordinates) continue;
+    const key = `${p.coordinates.lat.toFixed(6)},${p.coordinates.lng.toFixed(6)}`;
+    const bucket = grouped.get(key);
+    if (bucket) bucket.push(p);
+    else grouped.set(key, [p]);
+  }
+
+  grouped.forEach((bucket, key) => {
+    if (bucket.length === 1) {
+      const p = bucket[0];
+      out.set(p.id, { lat: p.coordinates!.lat, lng: p.coordinates!.lng });
+      return;
+    }
+
+    const baseLat = bucket[0].coordinates!.lat;
+    const baseLng = bucket[0].coordinates!.lng;
+    const baseRadiusMeters = Math.min(42, 18 + bucket.length * 2.5);
+    const latMeters = 111_320;
+    const lngMeters = Math.max(1, 111_320 * Math.cos((baseLat * Math.PI) / 180));
+    const seed = key.split("").reduce((s, ch) => s + ch.charCodeAt(0), 0);
+    const phase = (seed % 360) * (Math.PI / 180);
+
+    bucket.forEach((p, idx) => {
+      const angle = phase + (idx / bucket.length) * Math.PI * 2;
+      const ring = baseRadiusMeters + (idx % 2 === 0 ? 0 : 6);
+      const dLat = (Math.sin(angle) * ring) / latMeters;
+      const dLng = (Math.cos(angle) * ring) / lngMeters;
+      out.set(p.id, { lat: baseLat + dLat, lng: baseLng + dLng });
+    });
+  });
+
+  return out;
+}
+
 interface PropertyMapProps {
   properties: Property[];
   mapHeightClassName?: string;
@@ -100,8 +139,10 @@ export function PropertyMap({ properties, mapHeightClassName = "h-[500px]" }: Pr
 
     try {
       const bounds = (L as any).latLngBounds([]);
+      const displayCoords = computeDisplayCoordinates(propertiesWithCoordinates);
+
       propertiesWithCoordinates.forEach((property) => {
-        const coord = property.coordinates;
+        const coord = displayCoords.get(property.id) ?? property.coordinates;
         if (!coord) return;
         bounds.extend([coord.lat, coord.lng]);
 
@@ -136,7 +177,7 @@ export function PropertyMap({ properties, mapHeightClassName = "h-[500px]" }: Pr
       });
 
       if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [30, 30] });
+        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
       }
     } catch (error) {
       console.error("Error rendering property markers:", error);

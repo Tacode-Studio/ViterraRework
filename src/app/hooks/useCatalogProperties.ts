@@ -31,7 +31,7 @@ export type UseCatalogPropertiesOptions = {
   includeArchived?: boolean;
 };
 
-const CATALOG_STORAGE_KEY = "viterra_catalog_cache_properties";
+const CATALOG_STORAGE_KEY = "viterra_catalog_cache_properties_v2";
 
 /**
  * La caché del panel (que incluye fichas dadas de baja) va en una clave aparte: si
